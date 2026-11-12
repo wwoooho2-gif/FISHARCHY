@@ -1,0 +1,6 @@
+build-work/
+*.iso
+*.iso.part-*
+*.pkg.tar.zst
+pkg/
+src/

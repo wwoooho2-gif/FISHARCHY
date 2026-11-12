@@ -1,0 +1,15 @@
+# Maintainer: Furina
+pkgname=omarchy-no-preinstalls
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Fresh Omarchy installs without the preinstalled apps, web apps, and TUI wrappers'
+arch=('any')
+url='https://github.com/wwoooho2-gif'
+license=('MIT')
+
+package() {
+  install -Dm755 "$startdir/remove-preinstalls.sh" \
+    "$pkgdir/usr/share/omarchy-clean/remove-preinstalls.sh"
+  install -Dm755 "$startdir/hook-remove-preinstalls.sh" \
+    "$pkgdir/etc/skel/.config/omarchy/hooks/post-boot.d/05-remove-preinstalls"
+}

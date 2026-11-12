@@ -1,0 +1,18 @@
+# Maintainer: Furina
+pkgname=omarchy-radio-atlas
+pkgver=0.2.0
+pkgrel=1
+pkgdesc='Radio Atlas plugin for the Omarchy shell'
+arch=('any')
+url='https://github.com/AksharP5/omarchy-radio-atlas'
+license=('MIT')
+depends=('jq')
+
+package() {
+  install -dm755 "$pkgdir/usr/share/omarchy-radio-atlas/plugin"
+  cp -a "$startdir"/plugin/. "$pkgdir/usr/share/omarchy-radio-atlas/plugin/"
+
+  install -Dm755 "$startdir/install-plugin.sh" "$pkgdir/usr/share/omarchy-radio-atlas/install-plugin.sh"
+  install -Dm755 "$startdir/hook-plugin.sh" \
+    "$pkgdir/etc/skel/.config/omarchy/hooks/post-boot.d/30-radio-atlas-plugin"
+}
