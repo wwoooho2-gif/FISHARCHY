@@ -1,7 +1,7 @@
 pkgname=omarchy-no-preinstalls
 pkgver=1.0.0
 pkgrel=1
-pkgdesc='Fresh Omarchy installs without the preinstalled apps, web apps, and TUI wrappers'
+pkgdesc='Fresh Omarchy installs without the preinstalled apps, plus the FISHARCHY self-heal and launcher entry'
 arch=('any')
 url='https://github.com/wwoooho2-gif'
 license=('MIT')
@@ -11,4 +11,12 @@ package() {
     "$pkgdir/usr/share/omarchy-clean/remove-preinstalls.sh"
   install -Dm755 "$startdir/hook-remove-preinstalls.sh" \
     "$pkgdir/etc/skel/.config/omarchy/hooks/post-boot.d/05-remove-preinstalls"
+
+  # FISHARCHY repair script, launcher entry, and the first-boot self-heal hook
+  install -Dm755 "$startdir/fisharchy-repair.sh" \
+    "$pkgdir/usr/share/fisharchy/fisharchy-repair.sh"
+  install -Dm644 "$startdir/fisharchy-installer.desktop" \
+    "$pkgdir/usr/share/applications/fisharchy-installer.desktop"
+  install -Dm755 "$startdir/hook-fisharchy-selfheal.sh" \
+    "$pkgdir/etc/skel/.config/omarchy/hooks/post-boot.d/50-fisharchy-selfheal"
 }

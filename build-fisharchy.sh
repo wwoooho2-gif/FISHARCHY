@@ -10,6 +10,12 @@ custom=$builder/custom-packages
 OMARCHY_ISO_COMMIT=${OMARCHY_ISO_COMMIT:-38d8d05537a2442a73a92c0e1ccce0fb670f369a}
 GH_OWNER=${GH_OWNER:-wwoooho2-gif}
 
+# Universal build: one ISO for NVIDIA and non-NVIDIA machines.
+# The stock Omarchy installer detects the GPU at install time and picks the
+# right driver, so we keep every driver/firmware package in the image.
+# Run with FISHARCHY_KEEP_HARDWARE=0 ./build-fisharchy.sh for the old lean build.
+export FISHARCHY_KEEP_HARDWARE=${FISHARCHY_KEEP_HARDWARE:-1}
+
 need() {
   command -v "$1" >/dev/null 2>&1 || {
     echo "build-fisharchy: missing required command: $1" >&2
@@ -23,6 +29,16 @@ need docker
 need bsdtar
 
 mkdir -p "$work" "$pkgdest"
+
+# A cached builder tree or package mirror from the other mode is the usual
+# cause of a red installer failure screen, so reset it when the mode changes.
+mode_file=$work/.fisharchy-mode
+if [[ -f $mode_file && $(cat "$mode_file") != "$FISHARCHY_KEEP_HARDWARE" ]]; then
+  echo "==> Build mode changed; clearing cached ISO build state"
+  rm -rf -- "$work/omarchy-iso/release" "$work/omarchy-iso/.cache" "$work/omarchy-iso/custom-packages"
+  docker volume ls -q 2>/dev/null | grep -i omarchy | xargs -r docker volume rm >/dev/null 2>&1 || true
+fi
+echo "$FISHARCHY_KEEP_HARDWARE" > "$mode_file"
 
 clone_or_update() {
   local url=$1 dir=$2

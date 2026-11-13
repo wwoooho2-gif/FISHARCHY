@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Fish Installer
+GenericName=FISHARCHY repair
+Comment=Reinstall the Fish layout, theme and Radio Atlas
+Exec=xdg-terminal-exec /usr/share/fisharchy/fisharchy-repair.sh --run
+Icon=system-software-install
+Terminal=false
+Categories=System;Utility;
+Keywords=fish;fisharchy;layout;install;radio;

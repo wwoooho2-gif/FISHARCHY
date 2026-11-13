@@ -1,0 +1,11 @@
+FISHARCHY universal build
+=========================
+Drop this folder's files over your FISHARCHY project (overwrite build-fisharchy.sh), then:
+
+    ./build-fisharchy.sh
+
+This now builds ONE ISO with every NVIDIA / Intel / AMD driver kept.
+The Omarchy installer detects the GPU at install time and picks the right driver.
+
+Old lean single-PC build:   FISHARCHY_KEEP_HARDWARE=0 ./build-fisharchy.sh
+If you ever see the red failure screen again, photo it or run the installer's log.
