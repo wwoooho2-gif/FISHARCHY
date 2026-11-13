@@ -33,8 +33,9 @@ The finished image is published in this repository's **Releases** as
 | **Fish theme** | Default desktop theme, animated reef wallpaper, Fish menu buttons |
 | **FISHYLAYOUT** | `furina.omarchy-suite` dashboard, quick drawer, plugin manager, glass blur, workspace preview, GPU monitor, better media, taskbar, Alt+Tab |
 | **Radio Atlas** | `akshar.radio-atlas` world-radio globe, enabled in the bar |
-| **FISHARCHY bar layout** | The captured bar and dock layout: Fish bar on top, media beside the clock, GPU/audio/network/power on the right, dashboard widgets on the left |
-| **No preinstalls** | Omarchy's preinstalled desktop apps, web apps, TUI wrappers, and mise tools are removed, and the `preinstalls-removed` opt-out is recorded |
+| **FISHARCHY bar layout** | The current shell layout captured from `shell.json` plus its `shell.toml`: Fish bar on top, Bluetooth, media beside the clock, GPU/audio/network/power on the right, dashboard widgets on the left |
+| **No preinstalls** | Omarchy's preinstalled desktop apps, web apps, TUI wrappers, and mise tools are removed before the image is built, and the `preinstalls-removed` opt-out is recorded |
+| **Lean image** | The T2 Mac kernel, the legacy NVIDIA driver, and Surface firmware are left out of the download (about 900 MB smaller) |
 
 The result is a fresh Omarchy install that boots branded, lands on the Fish
 theme, and already has the dashboard layout in place.
@@ -81,7 +82,11 @@ is required; the build downloads several gigabytes and takes a while.
    through the prune/index step.
 2. Adds them to `builder/image.packages`, so they are installed in the root
    image that fresh installs are written from.
-3. Filters Omarchy's preinstall packages out of the shipped install lists.
+3. Filters Omarchy's preinstall packages out of the shipped install lists, and
+   drops the hardware this desktop does not need (T2 Mac kernel, legacy NVIDIA
+   driver, Surface firmware). Build with
+   `FISHARCHY_KEEP_HARDWARE=1 ./build-fisharchy.sh` for the full compatibility
+   image.
 
 First-boot behavior comes from `/etc/skel` hooks installed by the packages:
 `05-remove-preinstalls`, `10-fish-theme`, `20-fishylayout-plugin`,

@@ -7,6 +7,10 @@
 #
 # Usage: ./build-fisharchy.sh
 # Output: build-work/omarchy-iso/release/*.iso
+#
+# The default build is lean: it leaves out the T2 Mac kernel, the legacy NVIDIA
+# driver and Surface firmware (about 900 MB of download) for this desktop.
+# Set FISHARCHY_KEEP_HARDWARE=1 for an image that installs on any hardware.
 
 set -euo pipefail
 
