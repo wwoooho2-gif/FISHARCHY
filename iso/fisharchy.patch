@@ -24,7 +24,7 @@ index 5a3fc87..db06187 100755
    DOCKER_ARGS+=(
      -v "$LOCAL_OMARCHY_PATH:/omarchy-source:ro"
 diff --git i/builder/build-iso.sh w/builder/build-iso.sh
-index 0685dbc..178b43b 100755
+index 0685dbc..878f55d 100755
 --- i/builder/build-iso.sh
 +++ w/builder/build-iso.sh
 @@ -207,6 +207,30 @@ build_cache_dir=/var/cache
@@ -72,13 +72,14 @@ index 0685dbc..178b43b 100755
  fi
  live_packages_file="$build_cache_dir/packages.$OMARCHY_ARCH"
  printf '%s\n' "${arch_packages[@]}" >> "$live_packages_file"
-@@ -504,6 +531,53 @@ if [[ $OMARCHY_ARCH == aarch64 ]]; then
+@@ -504,6 +531,101 @@ if [[ $OMARCHY_ARCH == aarch64 ]]; then
    base_pkg_lists[0]=$aarch64_base_list
  fi
  
 +PREINSTALL_PACKAGES=(
 +  aether cliamp libreoffice-fresh pinta obsidian moonlight-qt
 +  omacut monologue omacalc omawrite hype signed superwhisper-bin
++  localsend
 +)
 +strip_preinstall_packages() {
 +  local list=$1 filtered
@@ -101,9 +102,10 @@ index 0685dbc..178b43b 100755
 +  done
 +fi
 +
-+FISHARCHY_LEAN_EXCLUDES=()
++FISHARCHY_LEAN_HARDWARE=()
++FISHARCHY_LEAN_TOOLS=()
 +if [[ ${FISHARCHY_KEEP_HARDWARE:-0} != 1 ]]; then
-+  FISHARCHY_LEAN_EXCLUDES=(
++  FISHARCHY_LEAN_HARDWARE=(
 +    linux-t2
 +    linux-t2-headers
 +    t2fanrd
@@ -113,20 +115,66 @@ index 0685dbc..178b43b 100755
 +    nvidia-580xx-dkms
 +    nvidia-580xx-utils
 +    lib32-nvidia-580xx-utils
++    lib32-nvidia-utils
 +    linux-firmware-marvell
++    asusctl
++    tuxedo-drivers-nocompatcheck-dkms
++    dell-xps-touchpad-haptics
++    dell-xps13-sidecar-amps
++    asus-proart-p14-speaker-firmware
++    qmk-hid
++    v4l2loopback-dkms
++    v4l2loopback-utils
++    v4l2-relayd
++    broadcom-wl-dkms
++    thermald
++    intel-lpmd
++    intel-ipu7-camera
++    intel-media-driver
++    libva-intel-driver
++    libvpl
++    vpl-gpu-rt
++    vulkan-intel
++    vulkan-radeon
++    vulkan-asahi
++  )
++  FISHARCHY_LEAN_TOOLS=(
++    dotnet-runtime
++    mariadb-libs
++    postgresql-libs
++    ruby
++    mise-bin
 +  )
 +fi
-+if (( ${#FISHARCHY_LEAN_EXCLUDES[@]} > 0 )); then
-+  lean_filtered="/tmp/$(basename "${base_pkg_lists[1]%.packages}").fisharchy-lean.packages"
-+  grep -Fxv -f <(printf '%s\n' "${FISHARCHY_LEAN_EXCLUDES[@]}") "${base_pkg_lists[1]}" >"$lean_filtered" || true
-+  base_pkg_lists[1]=$lean_filtered
-+  echo "FISHARCHY: dropping ${#FISHARCHY_LEAN_EXCLUDES[@]} unneeded hardware/theme packages from the image"
++strip_lean_packages() {
++  local list=$1 filtered
++  shift
++  [[ -f $list ]] || return 0
++  filtered="/tmp/$(basename "${list%.packages}").fisharchy-lean.packages"
++  grep -Fxv -f <(printf '%s\n' "$@") "$list" >"$filtered" || true
++  printf '%s\n' "$filtered"
++}
++if (( ${#FISHARCHY_LEAN_HARDWARE[@]} > 0 )); then
++  base_pkg_lists[0]=$(strip_lean_packages "${base_pkg_lists[0]}" "${FISHARCHY_LEAN_TOOLS[@]}")
++  base_pkg_lists[1]=$(strip_lean_packages "${base_pkg_lists[1]}" "${FISHARCHY_LEAN_HARDWARE[@]}" "${FISHARCHY_LEAN_TOOLS[@]}")
++  for i in "${!platform_lists[@]}"; do
++    platform_lists[i]=$(strip_lean_packages "${platform_lists[$i]}" "${FISHARCHY_LEAN_HARDWARE[@]}" "${FISHARCHY_LEAN_TOOLS[@]}")
++  done
++  if [[ -n ${platform_base_dir:-} && -d $platform_base_dir ]]; then
++    for platform_base in "$platform_base_dir"/omarchy-base.*.packages; do
++      [[ -f $platform_base ]] || continue
++      filtered=$(strip_lean_packages "$platform_base" "${FISHARCHY_LEAN_HARDWARE[@]}" "${FISHARCHY_LEAN_TOOLS[@]}")
++      mv -- "$filtered" "$platform_base"
++    done
++  fi
++  echo "FISHARCHY: lean profile drops ${#FISHARCHY_LEAN_HARDWARE[@]} hardware and ${#FISHARCHY_LEAN_TOOLS[@]} tool packages from the install lists"
++  echo "FISHARCHY: set FISHARCHY_KEEP_HARDWARE=1 to install everything the stock ISO would"
 +fi
 +
  mkdir -p "$build_cache_dir/airootfs/usr/share/omarchy-iso"
  cp "${base_pkg_lists[0]}" "$build_cache_dir/airootfs/usr/share/omarchy-iso/omarchy-base.packages"
  cp "${base_pkg_lists[1]}" "$build_cache_dir/airootfs/usr/share/omarchy-iso/omarchy-other.packages"
-@@ -644,6 +718,15 @@ mapfile -t target_packages < <(
+@@ -644,6 +766,15 @@ mapfile -t target_packages < <(
    } | sed 's/^broadcom-wl$/broadcom-wl-dkms/' | sort -u
  )
  
@@ -142,7 +190,7 @@ index 0685dbc..178b43b 100755
  # x86_64: Omarchy's optional list also names packages for aarch64 boards,
  # which have no x86_64 build. Each exclusion is explicit and printed, and the
  # list is a file of its own so it can be read without parsing this script.
-@@ -859,6 +942,25 @@ if [[ -n ${LOCAL_OMARCHY_BUILD:-} ]]; then
+@@ -859,6 +990,25 @@ if [[ -n ${LOCAL_OMARCHY_BUILD:-} ]]; then
    done
  fi
  
@@ -168,7 +216,7 @@ index 0685dbc..178b43b 100755
  printf '%s\n' "${required_package_files[@]}" |
    bash /builder/prune-offline-mirror.sh "$offline_mirror_dir"
  
-@@ -1158,7 +1260,11 @@ cp "$build_cache_dir/pacman-offline.conf" "$build_cache_dir/airootfs/etc/pacman.
+@@ -1158,7 +1308,11 @@ cp "$build_cache_dir/pacman-offline.conf" "$build_cache_dir/airootfs/etc/pacman.
  
  # Build the ISO. profiledef.sh reads OMARCHY_ARCH for the archiso arch/bootmodes.
  echo "[timing] mkarchiso start $(date +%s)"
@@ -182,15 +230,36 @@ index 0685dbc..178b43b 100755
  
  # The live initramfs must stay small enough for GRUB and the kernel to place
 diff --git i/builder/build-root-image.sh w/builder/build-root-image.sh
-index a8ceb60..6001157 100755
+index a8ceb60..2383377 100755
 --- i/builder/build-root-image.sh
 +++ w/builder/build-root-image.sh
-@@ -192,6 +192,9 @@ find "$root/var/log" -mindepth 1 ! -name pacman.log -delete
+@@ -192,6 +192,30 @@ find "$root/var/log" -mindepth 1 ! -name pacman.log -delete
  # Nothing downloaded, nothing to keep; and no build-host resolv.conf.
  rm -rf "$root/var/cache/pacman/pkg"/* "$root/etc/resolv.conf"
  
 +rm -rf "$root/usr/share/doc" "$root/usr/share/info" "$root/usr/share/gtk-doc"
 +find "$root/usr/share/locale" -mindepth 1 -maxdepth 1 ! -name 'en*' ! -name 'locale.alias' -exec rm -rf {} +
++
++if [[ ${FISHARCHY_KEEP_HARDWARE:-0} != 1 ]]; then
++  rm -rf "$root/usr/share/gir-1.0" "$root/usr/share/help"
++  rm -rf "$root"/usr/share/omarchy/themes/*/backgrounds/intros
++  if [[ ${OMARCHY_ARCH:-x86_64} == x86_64 && -d $root/usr/lib/firmware ]]; then
++    before=$(du -sm "$root/usr/lib/firmware" | cut -f1)
++    bash "$(dirname -- "${BASH_SOURCE[0]}")/prune-firmware.sh" "$root"
++    echo "Image firmware: ${before} MB -> $(du -sm "$root/usr/lib/firmware" | cut -f1) MB (this machine's radios, NIC, GPU and microcode only)"
++  fi
++  nvidia_sh="$root/usr/share/omarchy/install/hardware/nvidia.sh"
++  if [[ -f $nvidia_sh ]]; then
++    sed -i '/^[[:space:]]*if omarchy-hw-x86; then$/,/^[[:space:]]*fi$/d' "$nvidia_sh"
++    bash -n "$nvidia_sh"
++  fi
++  user_all="$root/usr/share/omarchy/install/user/all.sh"
++  if [[ -f $user_all ]]; then
++    sed -i '/user\/mise\.sh/d' "$user_all"
++    bash -n "$user_all"
++  fi
++  echo "FISHARCHY: lean image drops firmware, docs and the mise/lib32-nvidia setup"
++fi
 +
  if [[ -n ${OMARCHY_IMAGE_LOCALDB_COPY:-} ]]; then
    rm -rf "$OMARCHY_IMAGE_LOCALDB_COPY"
@@ -209,3 +278,46 @@ index 97f7aa9..f90a265 100644
 +omarchy-fishylayout
 +omarchy-radio-atlas
 +omarchy-no-preinstalls
+diff --git i/builder/prune-firmware.sh w/builder/prune-firmware.sh
+new file mode 100644
+index 0000000..e162587
+--- /dev/null
++++ w/builder/prune-firmware.sh
+@@ -0,0 +1,37 @@
++#!/bin/bash
++
++set -euo pipefail
++
++root=${1:-}
++if [[ -z $root ]]; then
++  echo "Usage: prune-firmware.sh <root>" >&2
++  exit 1
++fi
++
++fw="$root/usr/lib/firmware"
++[[ -d $fw ]] || exit 0
++
++find "$fw" -mindepth 1 -maxdepth 1 \
++  ! -name nvidia ! -name intel ! -name intel-ucode ! -name rtl_nic \
++  ! -name regulatory.db ! -name regulatory.db.p7s \
++  -exec rm -rf {} +
++
++if [[ -d $fw/intel ]]; then
++  find "$fw/intel" -mindepth 1 -maxdepth 1 \
++    ! -name iwlwifi ! -name 'ibt-*' \
++    -exec rm -rf {} +
++fi
++
++if [[ -d $fw/intel/iwlwifi ]]; then
++  find "$fw/intel/iwlwifi" -type f ! -name '*gf*' -delete
++fi
++
++if [[ -d $fw/nvidia ]]; then
++  find "$fw/nvidia" -mindepth 1 -maxdepth 1 ! -name '[0-9]*' -exec rm -rf {} +
++  for version_dir in "$fw"/nvidia/[0-9]*/; do
++    [[ -d $version_dir ]] || continue
++    find "$version_dir" -mindepth 1 -maxdepth 1 ! -name '*ga10x*' -exec rm -rf {} +
++  done
++fi
++
++find "$fw" -mindepth 1 -type d -empty -delete
