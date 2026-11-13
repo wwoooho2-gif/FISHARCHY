@@ -47,7 +47,7 @@ if [[ ! -d $builder/.git ]]; then
   git clone --quiet https://github.com/omacom-io/omarchy-iso.git "$builder"
 fi
 git -C "$builder" fetch --quiet origin
-git -C "$builder" checkout --quiet "$OMARCHY_ISO_COMMIT"
+git -C "$builder" checkout --quiet --force "$OMARCHY_ISO_COMMIT"
 git -C "$builder" submodule update --init --recursive --jobs=8
 
 if git -C "$builder" apply --check "$root/iso/fisharchy.patch" 2>/dev/null; then
