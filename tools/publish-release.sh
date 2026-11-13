@@ -1,13 +1,4 @@
 #!/bin/bash
-# Publish a built FISHARCHY ISO as a GitHub release.
-#
-# Usage: ./publish-release.sh [path/to/iso] [tag]
-# Default ISO: newest release/*.iso in this repository's build-work tree.
-# Default tag: v1.0.0
-#
-# GitHub caps each release asset at 2 GiB. An ISO over that is split into
-# FISHARCHY.iso.part-aa, -ab, ... and the parts plus FISHARCHY.iso.sha256 are
-# uploaded. Reassemble them with tools/reassemble-iso.sh.
 
 set -euo pipefail
 
@@ -45,8 +36,6 @@ printf '%s  FISHARCHY.iso\n' "$sha" >"$downloads/FISHARCHY.iso.sha256"
 rm -f "$downloads"/FISHARCHY.iso.part-*
 assets=("$iso" "$downloads/FISHARCHY.iso.sha256")
 if (( size > limit )); then
-  # The release carries only the parts plus checksum; the whole ISO stays local.
-  # Zero-padded numeric suffixes sort correctly for up to 99 parts.
   (cd "$downloads" && split -b 1900M -d -a 2 FISHARCHY.iso FISHARCHY.iso.part-)
   assets=("$downloads"/FISHARCHY.iso.part-* "$downloads/FISHARCHY.iso.sha256")
 fi

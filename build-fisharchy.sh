@@ -1,16 +1,4 @@
 #!/bin/bash
-# Build the FISHARCHY Omarchy ISO from scratch.
-#
-# Needs: git, base-devel (makepkg), docker (with sudo if the user is not in the
-# docker group), and GitHub credentials for the private wwoooho2-gif repos
-# (gh auth setup-git). Everything else happens in the ISO build container.
-#
-# Usage: ./build-fisharchy.sh
-# Output: build-work/omarchy-iso/release/*.iso
-#
-# The default build is lean: it leaves out the T2 Mac kernel, the legacy NVIDIA
-# driver and Surface firmware (about 900 MB of download) for this desktop.
-# Set FISHARCHY_KEEP_HARDWARE=1 for an image that installs on any hardware.
 
 set -euo pipefail
 
@@ -55,7 +43,6 @@ build_package() {
   )
 }
 
-# 1. The Omnarchy ISO builder, pinned to the commit iso/fisharchy.patch targets.
 if [[ ! -d $builder/.git ]]; then
   git clone --quiet https://github.com/omacom-io/omarchy-iso.git "$builder"
 fi
@@ -73,7 +60,6 @@ else
   exit 1
 fi
 
-# 2. The custom packages, built from their upstream repositories.
 clone_or_update "https://github.com/$GH_OWNER/omarchy-boot-branding.git" "$work/omarchy-boot-branding"
 clone_or_update "https://github.com/$GH_OWNER/omarchy-fish-theme.git" "$work/omarchy-fish-theme"
 clone_or_update "https://github.com/$GH_OWNER/FISHYLAYOUT.git" "$work/FISHYLAYOUT"
@@ -82,7 +68,6 @@ build_package "$work/omarchy-boot-branding"
 build_package "$work/omarchy-fish-theme"
 build_package "$work/FISHYLAYOUT"
 
-# Radio Atlas is upstream; its package recipe lives in this repository.
 clone_or_update https://github.com/AksharP5/omarchy-radio-atlas.git "$work/radio-atlas"
 radio_pkg=$work/pkgbuilds/omarchy-radio-atlas
 rm -rf -- "$radio_pkg"
@@ -95,13 +80,10 @@ build_package "$radio_pkg"
 
 build_package "$root/packages/omarchy-no-preinstalls"
 
-# 3. Stage the archives where the patched builder looks for them.
 mkdir -p "$custom"
 cp -f -- "$pkgdest"/*.pkg.tar.zst "$custom/"
 ls -1 "$custom"
 
-# 4. Build the ISO. --keep-pkg-cache avoids the interactive purge of the host
-#    pacman cache; --no-boot-offer makes the build unattended.
 cd -- "$builder"
 ./bin/omarchy-iso-make --no-boot-offer --keep-pkg-cache
 

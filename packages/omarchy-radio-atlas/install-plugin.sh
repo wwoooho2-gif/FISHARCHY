@@ -1,5 +1,4 @@
 #!/bin/bash
-# Install the bundled Radio Atlas plugin into the user's plugin directory.
 
 set -euo pipefail
 

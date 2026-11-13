@@ -1,23 +1,19 @@
 diff --git i/bin/omarchy-iso-make w/bin/omarchy-iso-make
-index 5a3fc87..89d88a4 100755
+index 5a3fc87..db06187 100755
 --- i/bin/omarchy-iso-make
 +++ w/bin/omarchy-iso-make
-@@ -231,6 +231,9 @@ DOCKER_ARGS=(
+@@ -231,6 +231,7 @@ DOCKER_ARGS=(
    -e "OMARCHY_SETTINGS_PACKAGE=${OMARCHY_SETTINGS_PACKAGE:-}"
    # Which of them --local-source builds; all of them unless this names fewer.
    -e "OMARCHY_LOCAL_PACKAGES=${OMARCHY_LOCAL_PACKAGES:-}"
-+  # FISHARCHY: pass the lean-image switch through to build-iso.sh. Empty means
-+  # the default lean profile (no T2/legacy-GPU/Surface support).
 +  -e "FISHARCHY_KEEP_HARDWARE=${FISHARCHY_KEEP_HARDWARE:-}"
    -e "HOST_UID=$(id -u)"
    -e "HOST_GID=$(id -g)"
    -v "$BUILD_RELEASE_PATH/:/out/"
-@@ -240,6 +243,14 @@ DOCKER_ARGS=(
+@@ -240,6 +241,12 @@ DOCKER_ARGS=(
    -v "$BUILD_ROOT/configs:/configs:ro"
  )
  
-+# FISHARCHY: locally built packages the build script stages into the offline
-+# mirror and bakes into the root image.
 +CUSTOM_PACKAGES_PATH="$BUILD_ROOT/custom-packages"
 +if [[ -d $CUSTOM_PACKAGES_PATH ]]; then
 +  CUSTOM_PACKAGES_PATH=$(realpath "$CUSTOM_PACKAGES_PATH")
@@ -28,16 +24,13 @@ index 5a3fc87..89d88a4 100755
    DOCKER_ARGS+=(
      -v "$LOCAL_OMARCHY_PATH:/omarchy-source:ro"
 diff --git i/builder/build-iso.sh w/builder/build-iso.sh
-index 0685dbc..273dfa2 100755
+index 0685dbc..178b43b 100755
 --- i/builder/build-iso.sh
 +++ w/builder/build-iso.sh
-@@ -207,6 +207,33 @@ build_cache_dir=/var/cache
+@@ -207,6 +207,30 @@ build_cache_dir=/var/cache
  offline_mirror_dir="$build_cache_dir/airootfs/var/cache/omarchy/mirror/offline"
  mkdir -p "$build_cache_dir" "$offline_mirror_dir"
  
-+# Custom packages built for this ISO. They are staged in the offline mirror
-+# only; the online databases know nothing about them, so they are kept out of
-+# the download transaction and added back to the keep-set by hand below.
 +CUSTOM_PACKAGES=(
 +  omarchy-boot-branding
 +  omarchy-fish-theme
@@ -65,16 +58,12 @@ index 0685dbc..273dfa2 100755
  # Seed from the official Arch releng profile.
  cp -r /archiso/configs/releng/* "$build_cache_dir/"
  rm "$build_cache_dir/airootfs/etc/motd"
-@@ -380,8 +407,15 @@ if [[ $OMARCHY_ARCH == aarch64 ]]; then
+@@ -380,8 +404,11 @@ if [[ $OMARCHY_ARCH == aarch64 ]]; then
    # saves a laptop's signed firmware from Windows with qcom-firmware-extract.
    arch_packages=("$OMARCHY_KERNEL" archlinuxarm-keyring git gum jq openssl openssh pciutils plymouth ttfx terminus-font tzupdate omarchy-keyring "$OMARCHY_SETTINGS_PACKAGE" lvm2 cryptsetup parted systemd-ukify linux-firmware-qcom qcom-firmware-extract python)
  else
 -  # linux-t2 is the live kernel on a Mac (configs/grub/grub.cfg).
 -  arch_packages=("$OMARCHY_KERNEL" linux-t2 git gum jq openssl plymouth ttfx terminus-font tzupdate omarchy-keyring "$OMARCHY_SETTINGS_PACKAGE" lvm2 cryptsetup parted)
-+  # linux-t2 is the live kernel on a Mac (configs/grub/grub.cfg). FISHARCHY
-+  # builds for this desktop and leaves it out (see FISHARCHY_LEAN below); GRUB
-+  # only selects it when the file exists, so a normal machine boots
-+  # linux-omarchy either way.
 +  live_kernel_packages=("$OMARCHY_KERNEL")
 +  if [[ ${FISHARCHY_KEEP_HARDWARE:-0} == 1 ]]; then
 +    live_kernel_packages+=(linux-t2)
@@ -83,14 +72,10 @@ index 0685dbc..273dfa2 100755
  fi
  live_packages_file="$build_cache_dir/packages.$OMARCHY_ARCH"
  printf '%s\n' "${arch_packages[@]}" >> "$live_packages_file"
-@@ -504,6 +538,70 @@ if [[ $OMARCHY_ARCH == aarch64 ]]; then
+@@ -504,6 +531,53 @@ if [[ $OMARCHY_ARCH == aarch64 ]]; then
    base_pkg_lists[0]=$aarch64_base_list
  fi
  
-+# A clean FISHARCHY install: keep Omarchy's preinstalled desktop apps, web
-+# apps, and TUI wrappers out of the install sets, so neither the root image nor
-+# the target install carries them. omarchy-no-preinstalls removes the seeded
-+# launchers and records the same opt-out marker as `omarchy remove preinstalls`.
 +PREINSTALL_PACKAGES=(
 +  aether cliamp libreoffice-fresh pinta obsidian moonlight-qt
 +  omacut monologue omacalc omawrite hype signed superwhisper-bin
@@ -116,16 +101,6 @@ index 0685dbc..273dfa2 100755
 +  done
 +fi
 +
-+# FISHARCHY: a lean image for the machine this ISO is built on (and for any
-+# ordinary x86_64 desktop). The download carries hardware support nobody here
-+# can use:
-+#   * the T2 Mac kernel and its userspace, and MacBook Wi-Fi/audio firmware
-+#   * the previous-generation NVIDIA driver and its 32-bit libraries; this
-+#     machine's Ampere GPU is served by the current nvidia-utils/nvidia-open-dkms
-+#   * Surface laptop firmware
-+# Together they are about 900 MB of the ISO. (Omarchy hard-depends on
-+# omarchy-themes-intros, so its theme videos stay.) Set
-+# FISHARCHY_KEEP_HARDWARE=1 to build the full compatibility image instead.
 +FISHARCHY_LEAN_EXCLUDES=()
 +if [[ ${FISHARCHY_KEEP_HARDWARE:-0} != 1 ]]; then
 +  FISHARCHY_LEAN_EXCLUDES=(
@@ -142,9 +117,6 @@ index 0685dbc..273dfa2 100755
 +  )
 +fi
 +if (( ${#FISHARCHY_LEAN_EXCLUDES[@]} > 0 )); then
-+  # The optional/hardware list is omarchy-other.packages. Filtering it here
-+  # keeps the packages out of the download closure, the offline mirror, the
-+  # shipped lists the installer reads, and the root image.
 +  lean_filtered="/tmp/$(basename "${base_pkg_lists[1]%.packages}").fisharchy-lean.packages"
 +  grep -Fxv -f <(printf '%s\n' "${FISHARCHY_LEAN_EXCLUDES[@]}") "${base_pkg_lists[1]}" >"$lean_filtered" || true
 +  base_pkg_lists[1]=$lean_filtered
@@ -154,12 +126,10 @@ index 0685dbc..273dfa2 100755
  mkdir -p "$build_cache_dir/airootfs/usr/share/omarchy-iso"
  cp "${base_pkg_lists[0]}" "$build_cache_dir/airootfs/usr/share/omarchy-iso/omarchy-base.packages"
  cp "${base_pkg_lists[1]}" "$build_cache_dir/airootfs/usr/share/omarchy-iso/omarchy-other.packages"
-@@ -644,6 +742,17 @@ mapfile -t target_packages < <(
+@@ -644,6 +718,15 @@ mapfile -t target_packages < <(
    } | sed 's/^broadcom-wl$/broadcom-wl-dkms/' | sort -u
  )
  
-+# The custom packages are not in the synced online databases; they are already
-+# in the offline mirror and are added to the keep-set directly below.
 +mapfile -t all_packages < <(
 +  printf '%s\n' "${all_packages[@]}" |
 +    grep -Fxv -f <(printf '%s\n' "${CUSTOM_PACKAGES[@]}") || true
@@ -172,12 +142,10 @@ index 0685dbc..273dfa2 100755
  # x86_64: Omarchy's optional list also names packages for aarch64 boards,
  # which have no x86_64 build. Each exclusion is explicit and printed, and the
  # list is a file of its own so it can be read without parsing this script.
-@@ -859,6 +968,27 @@ if [[ -n ${LOCAL_OMARCHY_BUILD:-} ]]; then
+@@ -859,6 +942,25 @@ if [[ -n ${LOCAL_OMARCHY_BUILD:-} ]]; then
    done
  fi
  
-+# Keep the exact custom archives staged above. They are not part of the online
-+# transaction, so without this the prune would delete them again.
 +for custom_package in "${CUSTOM_PACKAGES[@]}"; do
 +  custom_file=""
 +  for candidate in "$offline_mirror_dir/$custom_package-"*.pkg.tar.*; do
@@ -200,15 +168,12 @@ index 0685dbc..273dfa2 100755
  printf '%s\n' "${required_package_files[@]}" |
    bash /builder/prune-offline-mirror.sh "$offline_mirror_dir"
  
-@@ -1158,7 +1288,14 @@ cp "$build_cache_dir/pacman-offline.conf" "$build_cache_dir/airootfs/etc/pacman.
+@@ -1158,7 +1260,11 @@ cp "$build_cache_dir/pacman-offline.conf" "$build_cache_dir/airootfs/etc/pacman.
  
  # Build the ISO. profiledef.sh reads OMARCHY_ARCH for the archiso arch/bootmodes.
  echo "[timing] mkarchiso start $(date +%s)"
 -"$mkarchiso_command" -v -w "$build_cache_dir/work/" -o /out/ "$build_cache_dir/"
 +if ! "$mkarchiso_command" -v -w "$build_cache_dir/work/" -o /out/ "$build_cache_dir/"; then
-+  # libburn occasionally fails to open its stdio pseudo-drive at the final
-+  # write step even though /out is writable. The work tree is intact, so a
-+  # single retry after dropping the partial image finishes the build.
 +  echo "WARNING: mkarchiso failed; removing any partial ISO and retrying once" >&2
 +  rm -f /out/*.iso
 +  "$mkarchiso_command" -v -w "$build_cache_dir/work/" -o /out/ "$build_cache_dir/"
@@ -216,17 +181,29 @@ index 0685dbc..273dfa2 100755
  echo "[timing] mkarchiso end $(date +%s)"
  
  # The live initramfs must stay small enough for GRUB and the kernel to place
+diff --git i/builder/build-root-image.sh w/builder/build-root-image.sh
+index a8ceb60..6001157 100755
+--- i/builder/build-root-image.sh
++++ w/builder/build-root-image.sh
+@@ -192,6 +192,9 @@ find "$root/var/log" -mindepth 1 ! -name pacman.log -delete
+ # Nothing downloaded, nothing to keep; and no build-host resolv.conf.
+ rm -rf "$root/var/cache/pacman/pkg"/* "$root/etc/resolv.conf"
+ 
++rm -rf "$root/usr/share/doc" "$root/usr/share/info" "$root/usr/share/gtk-doc"
++find "$root/usr/share/locale" -mindepth 1 -maxdepth 1 ! -name 'en*' ! -name 'locale.alias' -exec rm -rf {} +
++
+ if [[ -n ${OMARCHY_IMAGE_LOCALDB_COPY:-} ]]; then
+   rm -rf "$OMARCHY_IMAGE_LOCALDB_COPY"
+   mkdir -p "$OMARCHY_IMAGE_LOCALDB_COPY"
 diff --git i/builder/image.packages w/builder/image.packages
-index 97f7aa9..c21b550 100644
+index 97f7aa9..f90a265 100644
 --- i/builder/image.packages
 +++ w/builder/image.packages
-@@ -32,3 +32,11 @@ efibootmgr
+@@ -32,3 +32,9 @@ efibootmgr
  omarchy-keyring
  lua51
  luarocks
 +
-+# FISHARCHY: custom packages built outside the channels and staged in the
-+# offline mirror by build-iso.sh.
 +omarchy-boot-branding
 +omarchy-fish-theme
 +omarchy-fishylayout

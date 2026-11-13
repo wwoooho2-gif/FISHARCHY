@@ -1,8 +1,4 @@
 #!/bin/bash
-# Reassemble the FISHARCHY ISO from the split release assets.
-#
-# Usage: ./reassemble.sh [download-dir] [output.iso]
-# Example: ./reassemble.sh ~/Downloads FISHARCHY.iso
 
 set -euo pipefail
 
