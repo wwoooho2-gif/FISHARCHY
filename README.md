@@ -12,6 +12,18 @@ The finished image is published in this repository's **Releases** as
 ./tools/reassemble-iso.sh ~/Downloads ~/Downloads/FISHARCHY.iso
 ```
 
+## Preview
+
+| Boot splash | SDDM login |
+|---|---|
+| ![Neon FISHARCHY boot splash](docs/preview/boot.png) | ![Neon SDDM login screen](docs/preview/login.png) |
+
+| Fish theme desktop | FISHARCHY bar layout |
+|---|---|
+| ![Fish theme desktop](docs/preview/desktop.png) | ![FISHYLAYOUT bar, dashboard, and dock](docs/preview/layout.png) |
+
+![Radio Atlas plugin](docs/preview/radio-atlas.png)
+
 ## What is baked in
 
 | Component | What it does |
