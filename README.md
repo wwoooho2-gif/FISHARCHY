@@ -89,7 +89,8 @@ is required; the build downloads several gigabytes and takes a while.
    theme intro videos, GUI help and all firmware except the Intel Wi-Fi and
    Bluetooth, Realtek Ethernet, NVIDIA GPU and CPU microcode this machine uses.
    Build with `FISHARCHY_KEEP_HARDWARE=1 ./build-fisharchy.sh` for the full
-   compatibility image.
+   compatibility image. The dropped dev runtimes come back with
+   `sudo pacman -S mise dotnet-runtime ruby` on the installed system.
 
 First-boot behavior comes from `/etc/skel` hooks installed by the packages:
 `05-remove-preinstalls`, `10-fish-theme`, `20-fishylayout-plugin`,
