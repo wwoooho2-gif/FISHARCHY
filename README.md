@@ -1,7 +1,8 @@
 # FISHARCHY
 
 A custom [Omarchy](https://omarchy.org/) ISO: clean, neon, and built around the
-Fish desktop.
+Fish desktop, with [FISHYLAYOUT](https://github.com/wwoooho2-gif/FISHYLAYOUT)
+as the shell and bar.
 
 The finished image is published in this repository's **Releases** as
 `FISHARCHY.iso` (split into `FISHARCHY.iso.part-*` when it exceeds GitHub's

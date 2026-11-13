@@ -18,7 +18,7 @@ index 5a3fc87..6d1b4a7 100755
    DOCKER_ARGS+=(
      -v "$LOCAL_OMARCHY_PATH:/omarchy-source:ro"
 diff --git i/builder/build-iso.sh w/builder/build-iso.sh
-index 0685dbc..e8bf112 100755
+index 0685dbc..d13e553 100755
 --- i/builder/build-iso.sh
 +++ w/builder/build-iso.sh
 @@ -207,6 +207,33 @@ build_cache_dir=/var/cache
@@ -65,7 +65,7 @@ index 0685dbc..e8bf112 100755
 +# launchers and records the same opt-out marker as `omarchy remove preinstalls`.
 +PREINSTALL_PACKAGES=(
 +  aether cliamp libreoffice-fresh pinta obsidian moonlight-qt
-+  omacut monologue omacalc omawrite hype signed
++  omacut monologue omacalc omawrite hype signed superwhisper-bin
 +)
 +strip_preinstall_packages() {
 +  local list=$1 filtered
