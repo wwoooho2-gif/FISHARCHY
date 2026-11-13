@@ -230,10 +230,10 @@ index 0685dbc..878f55d 100755
  
  # The live initramfs must stay small enough for GRUB and the kernel to place
 diff --git i/builder/build-root-image.sh w/builder/build-root-image.sh
-index a8ceb60..2383377 100755
+index a8ceb60..d8f245a 100755
 --- i/builder/build-root-image.sh
 +++ w/builder/build-root-image.sh
-@@ -192,6 +192,30 @@ find "$root/var/log" -mindepth 1 ! -name pacman.log -delete
+@@ -192,6 +192,36 @@ find "$root/var/log" -mindepth 1 ! -name pacman.log -delete
  # Nothing downloaded, nothing to keep; and no build-host resolv.conf.
  rm -rf "$root/var/cache/pacman/pkg"/* "$root/etc/resolv.conf"
  
@@ -243,6 +243,12 @@ index a8ceb60..2383377 100755
 +if [[ ${FISHARCHY_KEEP_HARDWARE:-0} != 1 ]]; then
 +  rm -rf "$root/usr/share/gir-1.0" "$root/usr/share/help"
 +  rm -rf "$root"/usr/share/omarchy/themes/*/backgrounds/intros
++  if [[ -d $root/usr/lib/chromium/locales ]]; then
++    find "$root/usr/lib/chromium/locales" -maxdepth 1 -type f ! -name 'en*' -delete
++  fi
++  if [[ -d $root/usr/share/qt6/translations ]]; then
++    find "$root/usr/share/qt6/translations" -maxdepth 1 -type f ! -name '*_en.qm' -delete
++  fi
 +  if [[ ${OMARCHY_ARCH:-x86_64} == x86_64 && -d $root/usr/lib/firmware ]]; then
 +    before=$(du -sm "$root/usr/lib/firmware" | cut -f1)
 +    bash "$(dirname -- "${BASH_SOURCE[0]}")/prune-firmware.sh" "$root"
