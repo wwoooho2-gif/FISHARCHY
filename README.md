@@ -35,7 +35,7 @@ The finished image is published in this repository's **Releases** as
 | **Radio Atlas** | `akshar.radio-atlas` world-radio globe, enabled in the bar |
 | **FISHARCHY bar layout** | The current shell layout captured from `shell.json` plus its `shell.toml`: Fish bar on top, Bluetooth, media beside the clock, GPU/audio/network/power on the right, dashboard widgets on the left |
 | **No preinstalls** | Omarchy's preinstalled desktop apps, web apps, TUI wrappers, and mise tools are removed before the image is built, and the `preinstalls-removed` opt-out is recorded |
-| **Lean image** | Built for this desktop: the T2 Mac kernel, legacy NVIDIA drivers, Surface firmware, other machines' radios and GPUs, unused dev runtimes, theme intro videos, GUI help and every firmware family this machine does not use are left out of the download (about 1.5 GB smaller) |
+| **Universal image** | One ISO for NVIDIA and non-NVIDIA machines: every GPU driver and firmware family stays in, and the installer detects the hardware and picks the driver at install time. `FISHARCHY_KEEP_HARDWARE=0` builds the single-PC lean image instead (T2 kernel, legacy NVIDIA, Surface firmware, other radios/GPUs, unused runtimes and unused firmware left out; about 1.5 GB smaller) |
 
 The result is a fresh Omarchy install that boots branded, lands on the Fish
 theme, and already has the dashboard layout in place.
@@ -82,14 +82,14 @@ is required; the build downloads several gigabytes and takes a while.
    through the prune/index step.
 2. Adds them to `builder/image.packages`, so they are installed in the root
    image that fresh installs are written from.
-3. Filters Omarchy's preinstall packages out of the shipped install lists, and
-   drops this desktop's unused hardware and tool runtimes (T2 Mac kernel,
-   legacy NVIDIA drivers, Surface and laptop vendor packages, AMD/Intel/other
-   GPUs and radios, mise/dotnet/ruby). In the root image it also removes the
-   theme intro videos, GUI help and all firmware except the Intel Wi-Fi and
-   Bluetooth, Realtek Ethernet, NVIDIA GPU and CPU microcode this machine uses.
-   Build with `FISHARCHY_KEEP_HARDWARE=1 ./build-fisharchy.sh` for the full
-   compatibility image. The dropped dev runtimes come back with
+3. Filters Omarchy's preinstall packages out of the shipped install lists. With
+   `FISHARCHY_KEEP_HARDWARE=0 ./build-fisharchy.sh` it also drops this desktop's
+   unused hardware and tool runtimes (T2 Mac kernel, legacy NVIDIA drivers,
+   Surface and laptop vendor packages, AMD/Intel/other GPUs and radios,
+   mise/dotnet/ruby), and in the root image removes the theme intro videos, GUI
+   help and all firmware except the Intel Wi-Fi and Bluetooth, Realtek
+   Ethernet, NVIDIA GPU and CPU microcode this machine uses. The default
+   universal build leaves all of that in. Dropped dev runtimes come back with
    `sudo pacman -S mise dotnet-runtime ruby` on the installed system.
 
 The live ISO and every installed system boot with `nowatchdog` on the kernel
