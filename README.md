@@ -92,6 +92,21 @@ is required; the build downloads several gigabytes and takes a while.
    compatibility image. The dropped dev runtimes come back with
    `sudo pacman -S mise dotnet-runtime ruby` on the installed system.
 
+The live ISO and every installed system boot with `nowatchdog` on the kernel
+command line: the NMI and hardware watchdogs stay off, so nothing arms a timer
+or probes lockups during and after boot. To also disable the CPU's
+Spectre/Meltdown/L1TF mitigations for the few percent of CPU time they cost,
+build with:
+
+```bash
+FISHARCHY_PERFORMANCE=1 ./build-fisharchy.sh
+```
+
+That trades those hardware-level defenses for speed, so keep the default on a
+machine that runs untrusted code. Most of the remaining wall-clock boot time is
+firmware POST (BIOS "Fast Boot", memory training) and the LUKS passphrase, not
+the image; the image's own userland reaches `graphical.target` in about 2.4 s.
+
 First-boot behavior comes from `/etc/skel` hooks installed by the packages:
 `05-remove-preinstalls`, `10-fish-theme`, `20-fishylayout-plugin`,
 `30-radio-atlas-plugin`, and `40-fish-layout`.

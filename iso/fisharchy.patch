@@ -1,16 +1,17 @@
 diff --git i/bin/omarchy-iso-make w/bin/omarchy-iso-make
-index 5a3fc87..db06187 100755
+index 5a3fc87..27d8c38 100755
 --- i/bin/omarchy-iso-make
 +++ w/bin/omarchy-iso-make
-@@ -231,6 +231,7 @@ DOCKER_ARGS=(
+@@ -231,6 +231,8 @@ DOCKER_ARGS=(
    -e "OMARCHY_SETTINGS_PACKAGE=${OMARCHY_SETTINGS_PACKAGE:-}"
    # Which of them --local-source builds; all of them unless this names fewer.
    -e "OMARCHY_LOCAL_PACKAGES=${OMARCHY_LOCAL_PACKAGES:-}"
 +  -e "FISHARCHY_KEEP_HARDWARE=${FISHARCHY_KEEP_HARDWARE:-}"
++  -e "FISHARCHY_PERFORMANCE=${FISHARCHY_PERFORMANCE:-}"
    -e "HOST_UID=$(id -u)"
    -e "HOST_GID=$(id -g)"
    -v "$BUILD_RELEASE_PATH/:/out/"
-@@ -240,6 +241,12 @@ DOCKER_ARGS=(
+@@ -240,6 +242,12 @@ DOCKER_ARGS=(
    -v "$BUILD_ROOT/configs:/configs:ro"
  )
  
@@ -24,10 +25,22 @@ index 5a3fc87..db06187 100755
    DOCKER_ARGS+=(
      -v "$LOCAL_OMARCHY_PATH:/omarchy-source:ro"
 diff --git i/builder/build-iso.sh w/builder/build-iso.sh
-index 0685dbc..878f55d 100755
+index 0685dbc..c9e4aa2 100755
 --- i/builder/build-iso.sh
 +++ w/builder/build-iso.sh
-@@ -207,6 +207,30 @@ build_cache_dir=/var/cache
+@@ -9,6 +9,11 @@ OMARCHY_KERNEL="${OMARCHY_KERNEL:-linux-omarchy}"
+ # profiledef.sh reads both in the mkarchiso environment.
+ export OMARCHY_ARCH OMARCHY_KERNEL
+ 
++FISHARCHY_BOOT_EXTRA="nowatchdog"
++if [[ ${FISHARCHY_PERFORMANCE:-0} == 1 ]]; then
++  FISHARCHY_BOOT_EXTRA+=" mitigations=off"
++fi
++
+ source /builder/node-release.sh
+ source /builder/arm64-kernel-image.sh
+ source /builder/archiso-aarch64-mkinitcpio.sh
+@@ -207,6 +212,30 @@ build_cache_dir=/var/cache
  offline_mirror_dir="$build_cache_dir/airootfs/var/cache/omarchy/mirror/offline"
  mkdir -p "$build_cache_dir" "$offline_mirror_dir"
  
@@ -58,7 +71,25 @@ index 0685dbc..878f55d 100755
  # Seed from the official Arch releng profile.
  cp -r /archiso/configs/releng/* "$build_cache_dir/"
  rm "$build_cache_dir/airootfs/etc/motd"
-@@ -380,8 +404,11 @@ if [[ $OMARCHY_ARCH == aarch64 ]]; then
+@@ -257,7 +286,7 @@ if [[ $OMARCHY_ARCH == aarch64 ]]; then
+   boot_splash_kernel_options="quiet splash "
+   # The N1x firmware's SPCR serial console would take the console from the
+   # panel, hence console=tty0 acpi=nospcr.
+-  kernel_options="console=tty0 acpi=nospcr initramfs_async=0"
++  kernel_options="console=tty0 acpi=nospcr initramfs_async=0 $FISHARCHY_BOOT_EXTRA"
+   # Snapdragon firmware hands the kernel no device tree. Once the live kernel
+   # and initramfs exist, wrap them in a UKI that carries the device trees the
+   # kernel package ships; GRUB chainloads it where there is one
+@@ -281,7 +310,7 @@ if [[ $OMARCHY_ARCH == aarch64 ]]; then
+   rm -rf "$build_cache_dir/syslinux" "$build_cache_dir/efiboot"
+ else
+   boot_splash_kernel_options="quiet splash "
+-  kernel_options="xe.enable_panel_replay=0 initramfs_async=0 intel_idle.states_off=0x3fc"
++  kernel_options="xe.enable_panel_replay=0 initramfs_async=0 intel_idle.states_off=0x3fc $FISHARCHY_BOOT_EXTRA"
+ fi
+ for grub_config in "$build_cache_dir/grub/grub.cfg" "$build_cache_dir/grub/loopback.cfg"; do
+   configure_grub_platform "$grub_config" "$OMARCHY_ARCH"
+@@ -380,8 +409,11 @@ if [[ $OMARCHY_ARCH == aarch64 ]]; then
    # saves a laptop's signed firmware from Windows with qcom-firmware-extract.
    arch_packages=("$OMARCHY_KERNEL" archlinuxarm-keyring git gum jq openssl openssh pciutils plymouth ttfx terminus-font tzupdate omarchy-keyring "$OMARCHY_SETTINGS_PACKAGE" lvm2 cryptsetup parted systemd-ukify linux-firmware-qcom qcom-firmware-extract python)
  else
@@ -72,7 +103,7 @@ index 0685dbc..878f55d 100755
  fi
  live_packages_file="$build_cache_dir/packages.$OMARCHY_ARCH"
  printf '%s\n' "${arch_packages[@]}" >> "$live_packages_file"
-@@ -504,6 +531,101 @@ if [[ $OMARCHY_ARCH == aarch64 ]]; then
+@@ -504,6 +536,101 @@ if [[ $OMARCHY_ARCH == aarch64 ]]; then
    base_pkg_lists[0]=$aarch64_base_list
  fi
  
@@ -174,7 +205,7 @@ index 0685dbc..878f55d 100755
  mkdir -p "$build_cache_dir/airootfs/usr/share/omarchy-iso"
  cp "${base_pkg_lists[0]}" "$build_cache_dir/airootfs/usr/share/omarchy-iso/omarchy-base.packages"
  cp "${base_pkg_lists[1]}" "$build_cache_dir/airootfs/usr/share/omarchy-iso/omarchy-other.packages"
-@@ -644,6 +766,15 @@ mapfile -t target_packages < <(
+@@ -644,6 +771,15 @@ mapfile -t target_packages < <(
    } | sed 's/^broadcom-wl$/broadcom-wl-dkms/' | sort -u
  )
  
@@ -190,7 +221,7 @@ index 0685dbc..878f55d 100755
  # x86_64: Omarchy's optional list also names packages for aarch64 boards,
  # which have no x86_64 build. Each exclusion is explicit and printed, and the
  # list is a file of its own so it can be read without parsing this script.
-@@ -859,6 +990,25 @@ if [[ -n ${LOCAL_OMARCHY_BUILD:-} ]]; then
+@@ -859,6 +995,25 @@ if [[ -n ${LOCAL_OMARCHY_BUILD:-} ]]; then
    done
  fi
  
@@ -216,7 +247,7 @@ index 0685dbc..878f55d 100755
  printf '%s\n' "${required_package_files[@]}" |
    bash /builder/prune-offline-mirror.sh "$offline_mirror_dir"
  
-@@ -1158,7 +1308,11 @@ cp "$build_cache_dir/pacman-offline.conf" "$build_cache_dir/airootfs/etc/pacman.
+@@ -1158,7 +1313,11 @@ cp "$build_cache_dir/pacman-offline.conf" "$build_cache_dir/airootfs/etc/pacman.
  
  # Build the ISO. profiledef.sh reads OMARCHY_ARCH for the archiso arch/bootmodes.
  echo "[timing] mkarchiso start $(date +%s)"
@@ -230,7 +261,7 @@ index 0685dbc..878f55d 100755
  
  # The live initramfs must stay small enough for GRUB and the kernel to place
 diff --git i/builder/build-root-image.sh w/builder/build-root-image.sh
-index a8ceb60..d8f245a 100755
+index a8ceb60..9182a97 100755
 --- i/builder/build-root-image.sh
 +++ w/builder/build-root-image.sh
 @@ -192,6 +192,36 @@ find "$root/var/log" -mindepth 1 ! -name pacman.log -delete
@@ -270,6 +301,27 @@ index a8ceb60..d8f245a 100755
  if [[ -n ${OMARCHY_IMAGE_LOCALDB_COPY:-} ]]; then
    rm -rf "$OMARCHY_IMAGE_LOCALDB_COPY"
    mkdir -p "$OMARCHY_IMAGE_LOCALDB_COPY"
+@@ -252,10 +282,18 @@ mkdir -p "$root/etc/kernel" "$root/etc/mkinitcpio.d" "$root/var/lib/omarchy-iso"
+ # (systemd's console size query hangs 1 boot in 10 with Plymouth on the VT).
+ # This embedded cmdline is what boots under Secure Boot, where Limine's entry
+ # options are ignored.
+-cat >"$root/etc/kernel/cmdline" <<'CMDLINE'
+-zswap.enabled=0 rootflags=subvol=@ rw rootfstype=btrfs initramfs_async=0 quiet splash loglevel=0 systemd.show_status=false rd.udev.log_level=0 vt.global_cursor_default=0 systemd.tty.term.console=dumb
++fisharchy_cmdline=nowatchdog
++if [[ ${FISHARCHY_PERFORMANCE:-0} == 1 ]]; then
++  fisharchy_cmdline+=' mitigations=off'
++fi
++cat >"$root/etc/kernel/cmdline" <<CMDLINE
++zswap.enabled=0 rootflags=subvol=@ rw rootfstype=btrfs initramfs_async=0 quiet splash loglevel=0 systemd.show_status=false rd.udev.log_level=0 vt.global_cursor_default=0 systemd.tty.term.console=dumb $fisharchy_cmdline
+ CMDLINE
+ 
++install -d "$root/etc/limine-entry-tool.d"
++printf 'KERNEL_CMDLINE[default]+=" %s"\n' "$fisharchy_cmdline" \
++  >"$root/etc/limine-entry-tool.d/99-fisharchy-performance.conf"
++
+ # The preset names the kernel version explicitly: mkinitcpio treats a glob in
+ # ALL_kver as a literal path. It sets no ALL_microcode, which is deprecated;
+ # the microcode hook in mkinitcpio.conf adds the microcode.
 diff --git i/builder/image.packages w/builder/image.packages
 index 97f7aa9..f90a265 100644
 --- i/builder/image.packages
