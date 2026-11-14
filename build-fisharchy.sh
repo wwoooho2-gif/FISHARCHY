@@ -10,6 +10,22 @@ custom=$builder/custom-packages
 OMARCHY_ISO_COMMIT=${OMARCHY_ISO_COMMIT:-38d8d05537a2442a73a92c0e1ccce0fb670f369a}
 GH_OWNER=${GH_OWNER:-wwoooho2-gif}
 
+for arg in "$@"; do
+  case $arg in
+    --lean) export FISHARCHY_KEEP_HARDWARE=0 ;;
+    --universal) export FISHARCHY_KEEP_HARDWARE=1 ;;
+    --hardened) export FISHARCHY_PERFORMANCE=0 ;;
+    -h|--help)
+      echo "usage: $0 [--universal|--lean] [--hardened]"
+      exit 0
+      ;;
+    *)
+      echo "build-fisharchy: unknown option: $arg" >&2
+      exit 1
+      ;;
+  esac
+done
+
 # Universal build: one ISO for NVIDIA and non-NVIDIA machines.
 # The stock Omarchy installer detects the GPU at install time and picks the
 # right driver, so we keep every driver/firmware package in the image.

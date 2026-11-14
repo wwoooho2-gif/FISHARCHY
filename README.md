@@ -76,7 +76,20 @@ applies `iso/fisharchy.patch`, builds the five packages with `makepkg`, stages
 them in the builder's `custom-packages/` volume, and runs the ISO build. Docker
 is required; the build downloads several gigabytes and takes a while.
 
-`iso/fisharchy.patch` does three things to the stock builder:
+The fastest ISO for this desktop is the lean build, which leaves out the ~1.5 GB
+of hardware this machine does not have and is quicker to write, boot and
+install:
+
+```bash
+./build-fisharchy.sh --lean        # this PC only
+./build-fisharchy.sh --universal   # default: every modern GPU and firmware
+./build-fisharchy.sh --hardened    # keep CPU mitigations on
+```
+
+`FISHARCHY_KEEP_HARDWARE=0` and `FISHARCHY_PERFORMANCE=0` do the same from the
+environment.
+
+`iso/fisharchy.patch` does four things to the stock builder:
 
 1. Copies the locally built archives into the offline mirror and keeps them
    through the prune/index step.
@@ -86,26 +99,32 @@ is required; the build downloads several gigabytes and takes a while.
    `FISHARCHY_KEEP_HARDWARE=0 ./build-fisharchy.sh` it also drops this desktop's
    unused hardware and tool runtimes (T2 Mac kernel, legacy NVIDIA drivers,
    Surface and laptop vendor packages, AMD/Intel/other GPUs and radios,
-   mise/dotnet/ruby), and in the root image removes the theme intro videos, GUI
-   help and all firmware except the Intel Wi-Fi and Bluetooth, Realtek
-   Ethernet, NVIDIA GPU and CPU microcode this machine uses. The default
-   universal build leaves all of that in. Dropped dev runtimes come back with
-   `sudo pacman -S mise dotnet-runtime ruby` on the installed system.
+   mise/dotnet/ruby), and in the root image removes all firmware except the
+   Intel Wi-Fi and Bluetooth, Realtek Ethernet, NVIDIA GPU and CPU microcode this
+   machine uses. The default universal build leaves all of that in. Dropped dev
+   runtimes come back with `sudo pacman -S mise dotnet-runtime ruby` on the
+   installed system.
+4. Trims things no install needs and downloads twenty packages at a time. Every
+   built system (universal or lean) loses the theme intro videos, GUI help,
+   translated manual pages, non-English Chromium and Qt translations, and the
+   glibc locale sources, and the man database is generated at build time so the
+   first boot does not have to index it. That is roughly 120 MB less to write at
+   install time. The build itself fetches with `ParallelDownloads = 20` instead
+   of 5, on a cold cache the difference between one download stream and twenty.
 
-The live ISO and every installed system boot with `nowatchdog` on the kernel
-command line: the NMI and hardware watchdogs stay off, so nothing arms a timer
-or probes lockups during and after boot. To also disable the CPU's
-Spectre/Meltdown/L1TF mitigations for the few percent of CPU time they cost,
-build with:
+The live ISO and every installed system boot with `nowatchdog` plus
+`mitigations=off` and `split_lock_detect=off` on the kernel command line: no NMI
+or hardware watchdog arms a timer, and the CPU's Spectre/Meltdown/L1TF/SRSO
+mitigations and split-lock traps are off. That is worth a few percent of CPU
+time on syscall-heavy work. To build the hardened variant instead:
 
 ```bash
-FISHARCHY_PERFORMANCE=1 ./build-fisharchy.sh
+FISHARCHY_PERFORMANCE=0 ./build-fisharchy.sh
 ```
 
-That trades those hardware-level defenses for speed, so keep the default on a
-machine that runs untrusted code. Most of the remaining wall-clock boot time is
-firmware POST (BIOS "Fast Boot", memory training) and the LUKS passphrase, not
-the image; the image's own userland reaches `graphical.target` in about 2.4 s.
+Most of the remaining wall-clock boot time is firmware POST (BIOS "Fast Boot",
+memory training) and the LUKS passphrase, not the image; the image's own userland
+reaches `graphical.target` in about 2.4 s.
 
 First-boot behavior comes from `/etc/skel` hooks installed by the packages:
 `05-remove-preinstalls`, `10-fish-theme`, `20-fishylayout-plugin`,
