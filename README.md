@@ -21,16 +21,6 @@ The finished image is published in this repository's **Releases** as
 
 ![Neon FISHARCHY boot splash](docs/preview/boot.png)
 
-| SDDM login | Fish theme desktop |
-|---|---|
-| ![Neon SDDM login screen](docs/preview/login.png) | ![Fish theme desktop](docs/preview/desktop.png) |
-
-**FISHARCHY bar layout:**
-
-![FISHYLAYOUT bar, dashboard, and dock](docs/preview/layout.png)
-
-![Radio Atlas plugin](docs/preview/radio-atlas.png)
-
 ## What is baked in
 
 | Component | What it does |
