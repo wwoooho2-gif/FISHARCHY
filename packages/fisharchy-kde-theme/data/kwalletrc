@@ -1,0 +1,5 @@
+[Wallet]
+Enabled=false
+First Use=false
+Prompt on Open=false
+Close When Idle=false

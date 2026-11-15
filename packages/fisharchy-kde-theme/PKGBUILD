@@ -1,6 +1,6 @@
 pkgname=fisharchy-kde-theme
 pkgver=1.0.0
-pkgrel=1
+pkgrel=2
 pkgdesc='FISHARCHY Neon look for KDE Plasma: color scheme, reef wallpaper and first-login setup'
 arch=('any')
 options=('!debug')
@@ -14,6 +14,9 @@ package() {
   install -Dm644 "$startdir/data/FisharchyNeon.colors" \
     "$pkgdir/usr/share/color-schemes/FisharchyNeon.colors"
   install -Dm644 "$startdir/data/kdeglobals" "$pkgdir/etc/xdg/kdeglobals"
+
+  # KDE Wallet is off by default: no "unlock wallet" prompts.
+  install -Dm644 "$startdir/data/kwalletrc" "$pkgdir/etc/xdg/kwalletrc"
 
   # Wallpaper package
   local wp="$pkgdir/usr/share/wallpapers/FisharchyReef"

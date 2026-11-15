@@ -34,7 +34,7 @@ Plasma.
 
 - [`omarchy-boot-branding`](https://github.com/wwoooho2-gif/omarchy-boot-branding) (private repository)
 - `packages/omarchy-no-preinstalls` - first-boot cleanup for the preinstalled apps
-- `packages/fisharchy-kde-theme` - the KDE color scheme, reef wallpaper and the once-per-user first-login script. Re-apply it any time with `/usr/share/fisharchy/fisharchy-theme-apply --force`
+- `packages/fisharchy-kde-theme` - the KDE color scheme, reef wallpaper and the once-per-user first-login script. It also turns KDE Wallet off by default (`/etc/xdg/kwalletrc`). Re-apply it any time with `/usr/share/fisharchy/fisharchy-theme-apply --force`
 
 ## Verify your download
 

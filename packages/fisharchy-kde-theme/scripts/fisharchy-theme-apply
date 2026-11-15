@@ -1,7 +1,7 @@
 #!/bin/bash
 # fisharchy-theme-apply: applied once per user at first KDE login.
 # Sets the FISHARCHY Neon color scheme and the Reef wallpaper through KDE's own
-# tools. Safe to run twice (marker file); pass --force to apply again.
+# tools, and keeps Chromium off KDE Wallet. Safe to run twice (marker file); pass --force to apply again.
 set -uo pipefail
 
 state="$HOME/.local/state/fisharchy"
@@ -22,5 +22,12 @@ fi
 if command -v plasma-apply-wallpaperimage >/dev/null 2>&1; then
   plasma-apply-wallpaperimage /usr/share/wallpapers/FisharchyReef >>"$state/theme.log" 2>&1 || true
 fi
+
+# No KDE Wallet: make Chromium keep passwords in its own store instead of
+# asking for the wallet. Added to the user's flags file only if no
+# --password-store choice is already there.
+flags="${XDG_CONFIG_HOME:-$HOME/.config}/chromium-flags.conf"
+mkdir -p "$(dirname -- "$flags")"
+grep -qs -- '--password-store' "$flags" || echo '--password-store=basic' >>"$flags"
 
 touch "$marker"
