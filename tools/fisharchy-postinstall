@@ -1,0 +1,125 @@
+#!/bin/bash
+# fisharchy-postinstall - add FISHARCHY to a freshly installed Omarchy system.
+#
+# Use this after installing from the small network-install ISO (build-fisharchy.sh --netinstall).
+# It builds the six FISHARCHY packages from their public repositories and installs them.
+#
+#   bash fisharchy-postinstall          ask first, then build and install
+#   bash fisharchy-postinstall --yes    do not ask
+#
+# Run it as your normal user (it uses sudo for the install). It needs an internet connection.
+set -euo pipefail
+
+GH_OWNER=${GH_OWNER:-wwoooho2-gif}
+yes=0
+[[ ${1:-} == --yes || ${1:-} == -y ]] && yes=1
+
+die() { echo "fisharchy-postinstall: $*" >&2; exit 1; }
+
+# Replace the boot/unlock-screen logo image in the omarchy-boot-branding checkout ($1) with the FISHARCHY one.
+# Matches PNGs named like a logo (or the Plymouth wordmark); prints each file, warns if none are found.
+replace_boot_logo() {
+  local dir=$1 logo=$2 f n=0
+  while IFS= read -r f; do
+    cp -f -- "$logo" "$f"; echo "    boot logo -> ${f#"$dir"/}"; n=$((n + 1))
+  done < <(find "$dir" -type f -iname '*.png' \( -iname '*logo*' -o -iname '*wordmark*' -o -iname 'watermark*' \) -not -path '*/.git/*' 2>/dev/null)
+  (( n > 0 )) || echo "WARNING: no logo PNG found in $dir; the boot screen may still say OMARCHY. Send me the file list of that repo." >&2
+}
+
+(( EUID != 0 )) || die "run this as your normal user, not root (it asks for sudo when needed)."
+command -v pacman >/dev/null 2>&1 || die "this needs Arch Linux / Omarchy (pacman not found)."
+command -v sudo >/dev/null 2>&1 || die "sudo is required."
+ping -c1 -W3 github.com >/dev/null 2>&1 || curl -fsI --max-time 8 https://github.com >/dev/null 2>&1 ||
+  die "cannot reach github.com. Connect to the internet first (Super+Ctrl+W opens the network panel)."
+
+cat <<INFO
+This will:
+  1. install build tools (base-devel, git, jq, zram-generator) if missing
+  2. download and build: omarchy-boot-branding, omarchy-fish-theme, FISHYLAYOUT (from github.com/$GH_OWNER),
+     Radio Atlas (github.com/AksharP5), and the FISHARCHY packages omarchy-no-preinstalls and fisharchy-tuning
+  3. install them with pacman, then run the FISHARCHY first-boot hooks for your user
+
+It does NOT remove any apps. Reboot afterwards so the tuning and boot branding take effect.
+INFO
+if (( ! yes )); then
+  read -rp "Continue? [y/N] " answer
+  [[ $answer == [yY]* ]] || { echo "Cancelled."; exit 0; }
+fi
+
+echo "==> Installing build tools"
+sudo pacman -S --needed --noconfirm base-devel git jq zram-generator
+
+work=${FISHARCHY_POSTINSTALL_DIR:-$HOME/.cache/fisharchy-postinstall}
+pkgdest=$work/pkgs
+mkdir -p "$work" "$pkgdest"
+rm -f -- "$pkgdest"/*.pkg.tar.*
+
+fetch() {  # fetch URL DIR  -> shallow clone, or update an earlier one
+  local url=$1 dir=$2
+  if [[ -d $dir/.git ]]; then
+    git -C "$dir" fetch --quiet --depth 1 origin HEAD && git -C "$dir" reset --quiet --hard FETCH_HEAD ||
+      die "cannot update $url"
+  else
+    rm -rf -- "$dir"
+    git clone --quiet --depth 1 "$url" "$dir" || die "cannot clone $url (is the repository public?)"
+  fi
+}
+
+build() {  # build DIR
+  printf '\n==> Building %s\n' "${1##*/}"
+  ( cd -- "$1" && PKGDEST="$pkgdest" makepkg -f --nodeps --noconfirm )
+}
+
+# Recipes for omarchy-no-preinstalls, fisharchy-tuning and omarchy-radio-atlas live in the FISHARCHY repo.
+self=$(readlink -f -- "${BASH_SOURCE[0]}")
+root=$(dirname -- "$(dirname -- "$self")")
+if [[ ! -d $root/packages/fisharchy-tuning ]]; then
+  fetch "https://github.com/$GH_OWNER/FISHARCHY.git" "$work/FISHARCHY"
+  root=$work/FISHARCHY
+fi
+
+fetch "https://github.com/$GH_OWNER/omarchy-boot-branding.git" "$work/omarchy-boot-branding"
+fetch "https://github.com/$GH_OWNER/omarchy-fish-theme.git"    "$work/omarchy-fish-theme"
+fetch "https://github.com/$GH_OWNER/FISHYLAYOUT.git"           "$work/FISHYLAYOUT"
+fetch "https://github.com/AksharP5/omarchy-radio-atlas.git"    "$work/radio-atlas"
+
+replace_boot_logo "$work/omarchy-boot-branding" "$root/iso/fisharchy-boot-logo.png"
+build "$work/omarchy-boot-branding"
+build "$work/omarchy-fish-theme"
+build "$work/FISHYLAYOUT"
+
+# Radio Atlas: package the upstream plugin with the FISHARCHY recipe (same steps as build-fisharchy.sh).
+radio=$work/pkgbuilds/omarchy-radio-atlas
+rm -rf -- "$radio"; mkdir -p "$radio/plugin"
+(cd -- "$work/radio-atlas" && tar --exclude=.git -cf - .) | tar -xf - -C "$radio/plugin"
+cp "$root"/packages/omarchy-radio-atlas/{PKGBUILD,install-plugin.sh,hook-plugin.sh} "$radio/"
+build "$radio"
+
+build "$root/packages/omarchy-no-preinstalls"
+build "$root/packages/fisharchy-tuning"
+
+shopt -s nullglob
+pkgs=("$pkgdest"/*.pkg.tar.*)
+(( ${#pkgs[@]} >= 6 )) || die "expected 6 built packages, found ${#pkgs[@]} in $pkgdest. Nothing was installed."
+
+echo
+echo "==> Installing ${#pkgs[@]} packages"
+sudo pacman -U --noconfirm "${pkgs[@]}"
+
+echo
+echo "==> Applying system settings"
+sudo systemctl daemon-reload
+sudo sysctl --system >/dev/null 2>&1 || true
+
+echo
+echo "==> Running the FISHARCHY first-boot hooks for $USER"
+# The packages put their hooks in /etc/skel (for new users); this runs them for the existing user.
+if [[ -x /usr/share/fisharchy/fisharchy-repair.sh ]]; then
+  /usr/share/fisharchy/fisharchy-repair.sh || echo "Some hooks failed; run 'Fish Installer' from the launcher (Super+Space) to retry."
+else
+  echo "fisharchy-repair.sh is missing; the packages may not have installed correctly." >&2
+fi
+
+echo
+echo "Done. Reboot now so the boot branding, tuning and layout take effect."
+echo "Check with: pacman -Q omarchy-boot-branding omarchy-fish-theme omarchy-fishylayout omarchy-radio-atlas omarchy-no-preinstalls fisharchy-tuning"

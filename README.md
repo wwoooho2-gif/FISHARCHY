@@ -7,12 +7,12 @@ Fish desktop, with [FISHYLAYOUT](https://github.com/wwoooho2-gif/FISHYLAYOUT)
 as the shell and bar.
 
 The finished image is published in this repository's **Releases** as
-`FISHARCHY.iso` (split into `FISHARCHY.iso.part-*` when it exceeds GitHub's
+`fisharchy.iso` (split into `fisharchy.iso.part-*` when it exceeds GitHub's
 2 GiB per-asset limit). Download every part into one directory and run
 `tools/reassemble-iso.sh` there.
 
 ```bash
-./tools/reassemble-iso.sh ~/Downloads ~/Downloads/FISHARCHY.iso
+./tools/reassemble-iso.sh ~/Downloads ~/Downloads/fisharchy.iso
 ```
 
 ## Preview
@@ -40,14 +40,14 @@ theme, and already has the dashboard layout in place.
 
 ## Verify your download
 
-Download `SHA256SUMS` from the same release as the ISO (or every `FISHARCHY.iso.part-*` file).
+Download `SHA256SUMS` from the same release as the ISO (or every `fisharchy.iso.part-*` file).
 
 ```bash
 # One-file ISO:
 sha256sum -c --ignore-missing SHA256SUMS
 
 # Split ISO: this checks every part, joins them, then checks the joined ISO.
-./tools/reassemble-iso.sh ~/Downloads ~/Downloads/FISHARCHY.iso
+./tools/reassemble-iso.sh ~/Downloads ~/Downloads/fisharchy.iso
 ```
 
 Both commands must say `OK`. If anything says `FAILED`, download the file again.
@@ -58,7 +58,7 @@ Writing erases the target device. Identify it first:
 
 ```bash
 lsblk -o NAME,SIZE,MODEL,TRAN        # your USB stick shows TRAN "usb"; check the size matches
-sudo dd if=~/Downloads/FISHARCHY.iso of=/dev/sdX bs=16M status=progress oflag=sync
+sudo dd if=~/Downloads/fisharchy.iso of=/dev/sdX bs=16M status=progress oflag=sync
 ```
 
 Replace `/dev/sdX` with the whole device (for example `/dev/sdb`, not `/dev/sdb1`). Re-run `lsblk`
@@ -162,6 +162,25 @@ The same values are written to `/etc/fisharchy-release` on every installed syste
 > non-English language files, so it **may not boot, or may have no working Wi-Fi, Bluetooth or
 > graphics, on any other machine**. Never publish or share a lean ISO.
 
+### Small network-install ISO (`fisharchy.iso`)
+
+```bash
+./build-fisharchy.sh --netinstall
+```
+
+This builds a small ISO (about 1.4 GiB instead of about 6 GB) and saves it as `fisharchy.iso` next to the
+script, with a `fisharchy.iso.sha256`. It needs Docker and git only. After you pick the keyboard layout, the
+installer asks you to connect to Wi-Fi (it skips this on Ethernet), then installs Omarchy over the network.
+
+- **It installs stock Omarchy, not the full FISHARCHY image.** After the first boot, run
+  `bash tools/fisharchy-postinstall` to build and install the six FISHARCHY packages from their public
+  repositories and run the first-boot hooks. Reboot afterwards.
+- **Unofficial builder.** It uses a third-party branch of the Omarchy ISO builder (omacom/omarchy-iso pull
+  request 256, closed upstream), pinned to an exact commit in `iso/versions.env`. Test it in a virtual
+  machine before using it on your laptop.
+- **The install needs a working internet connection the whole time.**
+- The normal `./build-fisharchy.sh` (full ISO with the FISHARCHY patch) is unchanged.
+
 `iso/fisharchy.patch` does these things to the stock builder:
 
 1. Copies the locally built archives into the offline mirror and keeps them through the prune step.
@@ -188,6 +207,7 @@ First-boot behavior comes from `/etc/skel` hooks installed by the packages: `05-
 2. Check free space (`df -h`): the build needs about 20 GB.
 3. If the message says the patch does not apply, upstream `omarchy-iso` changed. Keep the commit in `iso/versions.env`.
 4. If it says a private repo is unreachable, you do not have access: only the owner can rebuild.
+   If it says `multiple custom builds found for <package>`, an old copy of that package is in the cached offline mirror. `build-fisharchy.sh` now clears them before each build; on older copies, delete the `omarchy-*`/`fisharchy-*` `.pkg.tar.*` files under `build-work/omarchy-iso/.cache`.
 5. After switching between lean/universal or Safe/Max the script clears its cache; to force a clean start, delete `build-work/omarchy-iso/.cache` and `docker volume ls` entries containing "omarchy".
 
 **The ISO does not boot from USB.**

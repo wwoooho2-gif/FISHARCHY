@@ -1,0 +1,55 @@
+#!/bin/bash
+# fisharchy-crashlog: collect what you need after a crash into one text file you can read or share.
+# Usage: fisharchy-crashlog [output-file]     (default: ~/fisharchy-crashlog-DATE.txt)
+set -uo pipefail
+
+out=${1:-$HOME/fisharchy-crashlog-$(date +%Y%m%d-%H%M%S).txt}
+
+section() { printf '\n===== %s =====\n' "$1"; }
+run() { "$@" 2>&1 || true; }
+
+{
+  echo "FISHARCHY crash log - $(date)"
+  section "Release"
+  run cat /etc/fisharchy-release
+  run uname -r
+  section "Previous boot: errors (journalctl -b -1 -p err)"
+  if journalctl --list-boots 2>/dev/null | grep -q .; then
+    run journalctl -b -1 -p err --no-pager -n 400
+  else
+    echo "No previous boot in the journal (persistent logging may not have been active yet)."
+  fi
+  section "Previous boot: last 80 lines before it ended"
+  run journalctl -b -1 --no-pager -n 80
+  section "OOM kills (all boots we have)"
+  run journalctl -k --no-pager -g 'Out of memory|oom-kill|Killed process|systemd-oomd' -n 100
+  section "GPU driver errors"
+  run journalctl -k -b -1 --no-pager -g 'amdgpu|nvidia|NVRM|i915|xe |drm|GPU|Xid' -n 150
+  section "Kernel panics, MCE, hardware errors"
+  run journalctl -k -b -1 --no-pager -g 'panic|Oops|BUG:|Machine check|MCE|mce:|EDAC|hardware error|thermal|throttl' -n 100
+  section "Core dumps"
+  run coredumpctl list --no-pager
+  section "pstore (kernel messages saved across a crash)"
+  run ls -la /sys/fs/pstore
+  section "Memory watchdog (last 60 samples)"
+  run tail -n 60 /var/log/fisharchy/memwatch.log
+  section "Memory and swap now"
+  run free -h
+  run swapon --show
+  run cat /proc/pressure/memory
+  section "Temperatures (needs lm_sensors)"
+  if command -v sensors >/dev/null 2>&1; then run sensors; else echo "sensors not installed: sudo pacman -S lm_sensors"; fi
+  section "Disk health hint"
+  run lsblk -o NAME,SIZE,TYPE,ROTA,MOUNTPOINT
+} >"$out"
+
+echo "Wrote $out"
+cat <<'MSG'
+
+What this can and cannot tell you:
+- It CAN show out-of-memory kills, GPU driver resets and kernel panics.
+- A crash with nothing logged at all is typical of bad RAM, overheating or power problems.
+  Test RAM with memtest86+ from a separate USB stick (let it finish at least one full pass),
+  and watch `sensors` under load.
+- GPU driver bugs show up in the GPU section: note the driver version and report it upstream.
+MSG

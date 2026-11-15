@@ -1,0 +1,31 @@
+#!/bin/bash
+# fisharchy-memwatch: one line per run (every minute via timer) with memory pressure (PSI),
+# available RAM, swap use and OOM kill count. When pressure is high it also logs the top
+# memory users, so after a crash you can see what was eating RAM. Log is size-capped.
+set -euo pipefail
+
+log=${FISHARCHY_MEMWATCH_LOG:-/var/log/fisharchy/memwatch.log}
+max_lines=5000
+mkdir -p "$(dirname -- "$log")"
+
+psi_some=$(awk '/^some/ {split($2,a,"="); print a[2]}' /proc/pressure/memory 2>/dev/null || echo 0)
+psi_full=$(awk '/^full/ {split($2,a,"="); print a[2]}' /proc/pressure/memory 2>/dev/null || echo 0)
+avail_mb=$(awk '/^MemAvailable:/ {print int($2/1024)}' /proc/meminfo)
+swap_used_mb=$(awk '/^SwapTotal:/ {t=$2} /^SwapFree:/ {f=$2} END {print int((t-f)/1024)}' /proc/meminfo)
+oom_kills=$(awk '/^oom_kill / {print $2}' /proc/vmstat)
+
+printf '%s psi_some10=%s psi_full10=%s avail_mb=%s swap_used_mb=%s oom_kills=%s\n' \
+  "$(date '+%F %T')" "${psi_some:-0}" "${psi_full:-0}" "$avail_mb" "$swap_used_mb" "${oom_kills:-0}" >>"$log"
+
+# High pressure (full stall avg10 >= 5%) or less than 500 MB free: record the top 5 RSS users.
+if awk -v f="${psi_full:-0}" -v a="$avail_mb" 'BEGIN {exit !(f >= 5 || a < 500)}'; then
+  {
+    echo "  top memory users:"
+    ps -eo rss=,comm= --sort=-rss | head -5 | awk '{printf "    %d MB  %s\n", $1/1024, $2}'
+  } >>"$log"
+fi
+
+# Cap the log so it can never fill the disk.
+if (( $(wc -l <"$log") > max_lines )); then
+  tail -n "$max_lines" "$log" >"$log.tmp" && mv -- "$log.tmp" "$log"
+fi

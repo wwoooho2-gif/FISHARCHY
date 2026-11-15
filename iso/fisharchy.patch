@@ -226,7 +226,7 @@ index 0685dbc..9469dd1 100755
  # x86_64: Omarchy's optional list also names packages for aarch64 boards,
  # which have no x86_64 build. Each exclusion is explicit and printed, and the
  # list is a file of its own so it can be read without parsing this script.
-@@ -859,6 +999,25 @@ if [[ -n ${LOCAL_OMARCHY_BUILD:-} ]]; then
+@@ -859,6 +999,31 @@ if [[ -n ${LOCAL_OMARCHY_BUILD:-} ]]; then
    done
  fi
  
@@ -236,8 +236,14 @@ index 0685dbc..9469dd1 100755
 +    [[ -f $candidate && $candidate != *.sig ]] || continue
 +    read -r candidate_name _ < <(pacman -Qp "$candidate" 2>/dev/null) || continue
 +    [[ $candidate_name == "$custom_package" ]] || continue
++    # Only the archive staged by build-fisharchy.sh may stay; drop any other copy of the same package.
++    if [[ ! -f /custom-packages/${candidate##*/} ]]; then
++      echo "WARNING: removing non-FISHARCHY copy of $custom_package from the mirror: ${candidate##*/}" >&2
++      rm -f -- "$candidate" "$candidate.sig"
++      continue
++    fi
 +    if [[ -n $custom_file ]]; then
-+      echo "ERROR: multiple custom builds found for $custom_package" >&2
++      echo "ERROR: multiple custom builds found for $custom_package: $custom_file and ${candidate##*/}" >&2
 +      exit 1
 +    fi
 +    custom_file="${candidate##*/}"

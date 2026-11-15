@@ -1,0 +1,60 @@
+#!/bin/bash
+# fisharchy-wifi - connect the live ISO to the internet (Wi-Fi via iwd, or wired) before installing.
+# Run it in the live environment:  fisharchy-wifi
+set -u
+
+online() { ping -c1 -W3 archlinux.org >/dev/null 2>&1 || ping -c1 -W3 1.1.1.1 >/dev/null 2>&1; }
+strip_ansi() { sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g'; }
+
+if online; then echo "Already online."; exit 0; fi
+
+command -v iwctl >/dev/null 2>&1 || { echo "iwctl (iwd) not found; connect with another tool or use Ethernet." >&2; exit 1; }
+rfkill unblock wifi 2>/dev/null || true
+systemctl start iwd 2>/dev/null || true
+
+dev=""
+for w in /sys/class/net/*/wireless; do
+  [[ -d $w ]] && { dev=$(basename "$(dirname "$w")"); break; }
+done
+[[ -n $dev ]] || { echo "No Wi-Fi adapter found. Plug in Ethernet (or a USB tether) and run this again." >&2; exit 1; }
+
+wait_online() {
+  local i
+  for i in {1..15}; do online && return 0; sleep 1; done
+  return 1
+}
+
+while true; do
+  echo "Scanning for networks on $dev ..."
+  iwctl station "$dev" scan >/dev/null 2>&1 || true
+  sleep 4
+  mapfile -t ssids < <(
+    iwctl station "$dev" get-networks 2>/dev/null | strip_ansi |
+      sed -nE 's/^[[:space:]]*(>[[:space:]]*)?(.+[^[:space:]])[[:space:]]+(open|psk|8021x)[[:space:]]+[*_]+[[:space:]]*$/\2/p'
+  )
+  echo
+  i=1
+  for s in "${ssids[@]}"; do printf '  %2d) %s\n' "$i" "$s"; i=$((i + 1)); done
+  echo "   r) rescan    h) hidden network    q) quit"
+  read -rp "Choose a network: " pick
+  case $pick in
+    q) exit 1 ;;
+    r|"") continue ;;
+    h) read -rp "Hidden network name: " ssid; hidden=1 ;;
+    *[!0-9]*) echo "Not a valid choice."; continue ;;
+    *)
+      (( pick >= 1 && pick <= ${#ssids[@]} )) || { echo "Not a valid choice."; continue; }
+      ssid=${ssids[pick - 1]}; hidden=0 ;;
+  esac
+  [[ -n ${ssid:-} ]] || continue
+
+  read -rsp "Password for \"$ssid\" (empty for an open network): " pass; echo
+  args=(); [[ -n $pass ]] && args+=(--passphrase "$pass")
+  if (( hidden )); then
+    iwctl "${args[@]}" station "$dev" connect-hidden "$ssid"
+  else
+    iwctl "${args[@]}" station "$dev" connect "$ssid"
+  fi
+  if wait_online; then echo "Connected to $ssid. You are online."; exit 0; fi
+  echo "Could not get online with \"$ssid\". Try again."
+done

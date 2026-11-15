@@ -1,0 +1,7 @@
+[Unit]
+Description=FISHARCHY memory pressure logger
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/fisharchy-memwatch
+Nice=19

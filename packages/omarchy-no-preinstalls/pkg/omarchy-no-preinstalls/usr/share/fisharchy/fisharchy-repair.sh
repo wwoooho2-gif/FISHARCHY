@@ -48,8 +48,10 @@ repair() {
   echo "==> Clearing 'already installed' markers"
   rm -f "$HOME/.local/state/omarchy-radio-atlas/plugin-installed"
   # Other hooks may keep their own markers; clear any that look fish-related.
-  find "$HOME/.local/state" -maxdepth 3 -type f \
-    \( -iname '*fish*' -o -iname '*radio-atlas*' \) -print -delete 2>/dev/null
+  # Only markers that belong to FISHARCHY packages (never unrelated files that merely contain "fish").
+  find "$HOME/.local/state" -maxdepth 3 -type f ! -name selfheal.log \
+    \( -ipath '*/fisharchy*' -o -ipath '*/fishylayout*' -o -ipath '*/fish-theme*' \
+       -o -ipath '*/fish-layout*' -o -ipath '*/radio-atlas*' \) -print -delete 2>/dev/null || true
 
   echo
   echo "==> Running first-boot hooks"

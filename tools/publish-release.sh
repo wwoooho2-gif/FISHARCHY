@@ -27,7 +27,7 @@ gh_cmd() {
 }
 
 if [[ -z $iso ]]; then
-  iso=$(find "$root/build-work" -path '*/release/*.iso' -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-)
+  iso=$root/fisharchy.iso
 fi
 [[ -f $iso ]] || die "no ISO found; pass one explicitly"
 
@@ -37,31 +37,31 @@ if [[ -f $root/build-work/.fisharchy-mode ]] && grep -q 'hardware=lean' "$root/b
 fi
 
 mkdir -p "$downloads"
-cp -f -- "$iso" "$downloads/FISHARCHY.iso"
-size=$(stat -c %s "$downloads/FISHARCHY.iso")
+cp -f -- "$iso" "$downloads/fisharchy.iso"
+size=$(stat -c %s "$downloads/fisharchy.iso")
 
-rm -f -- "$downloads"/FISHARCHY.iso.part-* "$downloads/SHA256SUMS"
-assets=("$downloads/FISHARCHY.iso")
+rm -f -- "$downloads"/fisharchy.iso.part-* "$downloads/SHA256SUMS"
+assets=("$downloads/fisharchy.iso")
 if (( size > limit )); then
-  (cd "$downloads" && split -b 1900M -d -a 2 FISHARCHY.iso FISHARCHY.iso.part-)
-  assets=("$downloads"/FISHARCHY.iso.part-*)
+  (cd "$downloads" && split -b 1900M -d -a 2 fisharchy.iso fisharchy.iso.part-)
+  assets=("$downloads"/fisharchy.iso.part-*)
 fi
 # SHA256SUMS lists the ISO and every part; reassemble-iso.sh checks both.
-(cd "$downloads" && sha256sum -- FISHARCHY.iso FISHARCHY.iso.part-* 2>/dev/null >SHA256SUMS || sha256sum -- FISHARCHY.iso >SHA256SUMS)
+(cd "$downloads" && sha256sum -- fisharchy.iso fisharchy.iso.part-* 2>/dev/null >SHA256SUMS || sha256sum -- fisharchy.iso >SHA256SUMS)
 assets+=("$downloads/SHA256SUMS")
-sha=$(awk '$2 == "FISHARCHY.iso" {print $1}' "$downloads/SHA256SUMS")
+sha=$(awk '$2 == "fisharchy.iso" {print $1}' "$downloads/SHA256SUMS")
 
 if (( size > limit )); then
   read -r -d '' how <<'SPLIT' || true
 This ISO is split because GitHub caps release assets at 2 GiB. Download every
-`FISHARCHY.iso.part-*` file and `SHA256SUMS` into one directory, then join and verify:
+`fisharchy.iso.part-*` file and `SHA256SUMS` into one directory, then join and verify:
 
 ```bash
-./tools/reassemble-iso.sh ~/Downloads ~/Downloads/FISHARCHY.iso
+./tools/reassemble-iso.sh ~/Downloads ~/Downloads/fisharchy.iso
 ```
 SPLIT
 else
-  how='Download `FISHARCHY.iso` and `SHA256SUMS`, then verify with `sha256sum -c --ignore-missing SHA256SUMS`.'
+  how='Download `fisharchy.iso` and `SHA256SUMS`, then verify with `sha256sum -c --ignore-missing SHA256SUMS`.'
 fi
 
 notes=$(mktemp)
@@ -73,7 +73,7 @@ FISHARCHY — a clean, neon, Fish-themed Omarchy ISO.
 
 $how
 
-**SHA-256 (FISHARCHY.iso):** \`$sha\`
+**SHA-256 (fisharchy.iso):** \`$sha\`
 
 ## Included
 
@@ -91,7 +91,7 @@ Everything on it is erased.
 
 \`\`\`bash
 lsblk -o NAME,SIZE,MODEL,TRAN
-sudo dd if=~/Downloads/FISHARCHY.iso of=/dev/sdX bs=16M status=progress oflag=sync
+sudo dd if=~/Downloads/fisharchy.iso of=/dev/sdX bs=16M status=progress oflag=sync
 \`\`\`
 NOTES
 

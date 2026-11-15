@@ -1,11 +1,11 @@
 #!/bin/bash
 # reassemble-iso.sh DIR [OUTPUT]
-# Joins FISHARCHY.iso.part-* from DIR into OUTPUT, checking every part against SHA256SUMS first
+# Joins fisharchy.iso.part-* from DIR into OUTPUT, checking every part against SHA256SUMS first
 # and the joined ISO afterwards. Stops with a clear error on any mismatch.
 set -euo pipefail
 
 dir=${1:-.}
-out=${2:-FISHARCHY.iso}
+out=${2:-fisharchy.iso}
 
 die() { echo "reassemble: $*" >&2; exit 1; }
 
@@ -14,8 +14,8 @@ out=$(realpath -m -- "$out")   # resolve before changing directory
 cd -- "$dir"
 [[ -f SHA256SUMS ]] || die "SHA256SUMS is missing in $PWD. Download it from the same release as the parts."
 
-mapfile -t parts < <(ls -1 FISHARCHY.iso.part-* 2>/dev/null | sort)
-(( ${#parts[@]} > 0 )) || die "no FISHARCHY.iso.part-* files in $PWD"
+mapfile -t parts < <(ls -1 fisharchy.iso.part-* 2>/dev/null | sort)
+(( ${#parts[@]} > 0 )) || die "no fisharchy.iso.part-* files in $PWD"
 
 echo "==> Checking ${#parts[@]} part(s) against SHA256SUMS"
 for part in "${parts[@]}"; do
@@ -34,8 +34,8 @@ done
 echo "==> Joining into $out"
 cat -- "${parts[@]}" >"$out"
 
-want=$(awk '$2 == "FISHARCHY.iso" {print $1}' SHA256SUMS)
-[[ -n $want ]] || die "SHA256SUMS has no entry for FISHARCHY.iso"
+want=$(awk '$2 == "fisharchy.iso" {print $1}' SHA256SUMS)
+[[ -n $want ]] || die "SHA256SUMS has no entry for fisharchy.iso"
 have=$(sha256sum -- "$out" | cut -d' ' -f1)
 if [[ $have != "$want" ]]; then
   rm -f -- "$out"
