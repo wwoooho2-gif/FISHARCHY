@@ -1,0 +1,7 @@
+# I/O scheduler per device type. Check: cat /sys/block/<dev>/queue/scheduler
+# NVMe: no scheduler, the device queues are deep enough.
+ACTION=="add|change", KERNEL=="nvme[0-9]*n[0-9]*", ENV{DEVTYPE}=="disk", ATTR{queue/scheduler}="none"
+# SATA/USB SSD and eMMC/SD: mq-deadline, low overhead.
+ACTION=="add|change", KERNEL=="sd[a-z]|mmcblk[0-9]*", ENV{DEVTYPE}=="disk", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="mq-deadline"
+# Spinning disks: bfq for fair, responsive desktop I/O.
+ACTION=="add|change", KERNEL=="sd[a-z]", ENV{DEVTYPE}=="disk", ATTR{queue/rotational}=="1", ATTR{queue/scheduler}="bfq"

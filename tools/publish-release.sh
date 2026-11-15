@@ -1,67 +1,79 @@
 #!/bin/bash
-
+# publish-release.sh [ISO] [TAG]
+# Copies the ISO to a download folder, splits it if it exceeds GitHub's 2 GiB asset cap, writes
+# SHA256SUMS (ISO and every part) and creates the GitHub release. Never publish a lean ISO.
 set -euo pipefail
 
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+# shellcheck source=iso/versions.env
+source "$root/iso/versions.env"
+
 repo=${GH_REPO:-wwoooho2-gif/FISHARCHY}
 iso=${1:-}
-tag=${2:-v1.0.0}
+tag=${2:-v$FISHARCHY_VERSION}
 downloads=${FISHARCHY_DOWNLOADS:-$HOME/Downloads}
 limit=$((1900 * 1024 * 1024)) # comfortably below GitHub's 2 GiB asset cap
+
+die() { echo "publish-release: $*" >&2; exit 1; }
 
 gh_cmd() {
   if command -v gh >/dev/null 2>&1; then
     gh "$@"
+  elif command -v mise >/dev/null 2>&1; then
+    mise x gh@latest -- gh "$@"
   else
-    mise x gh@2.103.3 -- gh "$@"
+    die "the GitHub CLI 'gh' is required (pacman -S github-cli)."
   fi
 }
 
 if [[ -z $iso ]]; then
-  iso=$(find "$root/build-work" "$root/../omarchy-iso/release" /home/furina/Work/omarchy-iso/release \
-    -maxdepth 1 -name '*.iso' -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-)
+  iso=$(find "$root/build-work" -path '*/release/*.iso' -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-)
 fi
-if [[ ! -f $iso ]]; then
-  echo "publish-release: no ISO found; pass one explicitly" >&2
-  exit 1
+[[ -f $iso ]] || die "no ISO found; pass one explicitly"
+
+# Refuse to publish a lean image: it only works on the PC it was built for.
+if [[ -f $root/build-work/.fisharchy-mode ]] && grep -q 'hardware=lean' "$root/build-work/.fisharchy-mode"; then
+  die "the last build was --lean (this PC only). Build with --universal before publishing."
 fi
 
 mkdir -p "$downloads"
 cp -f -- "$iso" "$downloads/FISHARCHY.iso"
-iso=$downloads/FISHARCHY.iso
-size=$(stat -c %s "$iso")
-sha=$(sha256sum "$iso" | cut -d' ' -f1)
-printf '%s  FISHARCHY.iso\n' "$sha" >"$downloads/FISHARCHY.iso.sha256"
+size=$(stat -c %s "$downloads/FISHARCHY.iso")
 
-rm -f "$downloads"/FISHARCHY.iso.part-*
-assets=("$iso" "$downloads/FISHARCHY.iso.sha256")
+rm -f -- "$downloads"/FISHARCHY.iso.part-* "$downloads/SHA256SUMS"
+assets=("$downloads/FISHARCHY.iso")
 if (( size > limit )); then
   (cd "$downloads" && split -b 1900M -d -a 2 FISHARCHY.iso FISHARCHY.iso.part-)
-  assets=("$downloads"/FISHARCHY.iso.part-* "$downloads/FISHARCHY.iso.sha256")
+  assets=("$downloads"/FISHARCHY.iso.part-*)
+fi
+# SHA256SUMS lists the ISO and every part; reassemble-iso.sh checks both.
+(cd "$downloads" && sha256sum -- FISHARCHY.iso FISHARCHY.iso.part-* 2>/dev/null >SHA256SUMS || sha256sum -- FISHARCHY.iso >SHA256SUMS)
+assets+=("$downloads/SHA256SUMS")
+sha=$(awk '$2 == "FISHARCHY.iso" {print $1}' "$downloads/SHA256SUMS")
+
+if (( size > limit )); then
+  read -r -d '' how <<'SPLIT' || true
+This ISO is split because GitHub caps release assets at 2 GiB. Download every
+`FISHARCHY.iso.part-*` file and `SHA256SUMS` into one directory, then join and verify:
+
+```bash
+./tools/reassemble-iso.sh ~/Downloads ~/Downloads/FISHARCHY.iso
+```
+SPLIT
+else
+  how='Download `FISHARCHY.iso` and `SHA256SUMS`, then verify with `sha256sum -c --ignore-missing SHA256SUMS`.'
 fi
 
 notes=$(mktemp)
 trap 'rm -f "$notes"' EXIT
-cat >"$notes" <<EOF
+cat >"$notes" <<NOTES
 FISHARCHY — a clean, neon, Fish-themed Omarchy ISO.
 
 ## Download
 
-$(if (( size > limit )); then
-  cat <<'SPLIT'
-This ISO is split because GitHub caps release assets at 2 GiB. Download every
-\`FISHARCHY.iso.part-*\` file and \`FISHARCHY.iso.sha256\` into one directory,
-then reassemble and verify:
+$how
 
-\`\`\`bash
-./tools/reassemble-iso.sh ~/Downloads ~/Downloads/FISHARCHY.iso
-\`\`\`
-SPLIT
-else
-  echo 'Download `FISHARCHY.iso`, then verify it with `sha256sum -c FISHARCHY.iso.sha256`.'
-fi)
-
-**SHA-256:** \`$sha\`
+**SHA-256 (FISHARCHY.iso):** \`$sha\`
 
 ## Included
 
@@ -69,20 +81,23 @@ fi)
 - Fish theme as the default desktop theme
 - FISHYLAYOUT dashboard and the FISHARCHY bar/dock layout
 - Radio Atlas plugin, enabled in the bar
+- Performance and stability layer (zram, OOM handling, crash log); CPU mitigations ON by default
 - No preinstalled Omarchy desktop apps, web apps, TUI wrappers, or mise tools
 
 ## Write to USB
 
+Find your USB stick first with \`lsblk\`, then replace \`/dev/sdX\` with the whole device (not a partition).
+Everything on it is erased.
+
 \`\`\`bash
+lsblk -o NAME,SIZE,MODEL,TRAN
 sudo dd if=~/Downloads/FISHARCHY.iso of=/dev/sdX bs=16M status=progress oflag=sync
 \`\`\`
-
-Replace \`/dev/sdX\` with the USB device (not a partition).
-EOF
+NOTES
 
 gh_cmd release create "$tag" "${assets[@]}" \
   --repo "$repo" \
-  --title "FISHARCHY 1.0.0" \
+  --title "FISHARCHY ${tag#v}" \
   --notes-file "$notes" \
   --latest
 

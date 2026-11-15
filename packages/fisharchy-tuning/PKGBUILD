@@ -1,0 +1,34 @@
+pkgname=fisharchy-tuning
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='FISHARCHY performance and stability layer: sysctl, zram, OOM handling, crash log, modes'
+arch=('any')
+url='https://github.com/wwoooho2-gif/FISHARCHY'
+license=('MIT')
+depends=('systemd' 'zram-generator')
+optdepends=('lm_sensors: temperature readings in fisharchy-crashlog')
+
+package() {
+  cd "$startdir/files"
+  install -Dm644 sysctl/99-fisharchy.conf "$pkgdir/usr/lib/sysctl.d/99-fisharchy.conf"
+  install -Dm644 modules/fisharchy-bbr.conf "$pkgdir/usr/lib/modules-load.d/fisharchy-bbr.conf"
+  install -Dm644 zram/fisharchy-zram.conf "$pkgdir/usr/lib/systemd/zram-generator.conf.d/fisharchy.conf"
+  install -Dm644 oomd/10-fisharchy.conf "$pkgdir/usr/lib/systemd/oomd.conf.d/10-fisharchy.conf"
+  install -Dm644 oomd/user-slice-oomd.conf "$pkgdir/usr/lib/systemd/system/user.slice.d/10-fisharchy-oomd.conf"
+  install -Dm644 oomd/wayland-wm-avoid.conf "$pkgdir/usr/lib/systemd/user/wayland-wm@.service.d/10-fisharchy-oomd.conf"
+  install -Dm644 journald/10-fisharchy.conf "$pkgdir/usr/lib/systemd/journald.conf.d/10-fisharchy.conf"
+  install -Dm644 coredump/10-fisharchy.conf "$pkgdir/usr/lib/systemd/coredump.conf.d/10-fisharchy.conf"
+  install -Dm644 udev/60-fisharchy-ioschedulers.rules "$pkgdir/usr/lib/udev/rules.d/60-fisharchy-ioschedulers.rules"
+  install -Dm644 systemd/fisharchy-memwatch.service "$pkgdir/usr/lib/systemd/system/fisharchy-memwatch.service"
+  install -Dm644 systemd/fisharchy-memwatch.timer "$pkgdir/usr/lib/systemd/system/fisharchy-memwatch.timer"
+  for tool in fisharchy-memwatch fisharchy-crashlog fisharchy-mode fisharchy-bench; do
+    install -Dm755 "bin/$tool" "$pkgdir/usr/bin/$tool"
+  done
+
+  # Enable at boot by shipping the wants symlinks (no post-install script needed).
+  install -dm755 "$pkgdir/usr/lib/systemd/system/timers.target.wants" \
+                 "$pkgdir/usr/lib/systemd/system/multi-user.target.wants"
+  ln -s ../fisharchy-memwatch.timer "$pkgdir/usr/lib/systemd/system/timers.target.wants/fisharchy-memwatch.timer"
+  ln -s /usr/lib/systemd/system/fstrim.timer "$pkgdir/usr/lib/systemd/system/timers.target.wants/fstrim.timer"
+  ln -s /usr/lib/systemd/system/systemd-oomd.service "$pkgdir/usr/lib/systemd/system/multi-user.target.wants/systemd-oomd.service"
+}

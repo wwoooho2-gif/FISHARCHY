@@ -1,0 +1,45 @@
+#!/bin/bash
+# fisharchy-bench: record boot time, idle RAM, install size and a short CPU/disk test to a text file.
+# Run it twice (for example Safe vs Max, or before vs after an update) and compare the files.
+# Usage: fisharchy-bench [output-file]
+set -uo pipefail
+
+out=${1:-$HOME/fisharchy-bench-$(date +%Y%m%d-%H%M%S).txt}
+release=/etc/fisharchy-release
+
+{
+  echo "FISHARCHY benchmark - $(date)"
+  echo "-- Release --"
+  cat "$release" 2>/dev/null || echo "no $release"
+  echo "kernel: $(uname -r)"
+  echo "desktop session: ${XDG_CURRENT_DESKTOP:-unknown}"
+  echo "cmdline: $(cat /proc/cmdline)"
+  echo
+  echo "-- Boot time (systemd-analyze) --"
+  systemd-analyze 2>&1
+  systemd-analyze blame 2>/dev/null | head -10
+  echo
+  echo "-- Idle RAM now (let the desktop settle for 2 minutes first) --"
+  free -m
+  echo "memory pressure: $(tr '\n' ' ' </proc/pressure/memory 2>/dev/null)"
+  echo
+  echo "-- Installed size on disk --"
+  df -h / | tail -n 2
+  du -sh /usr /var/lib/pacman 2>/dev/null
+  echo
+  echo "-- CPU test: 5 s of integer hashing (higher is better) --"
+  end=$((SECONDS + 5)); n=0
+  while (( SECONDS < end )); do
+    for _ in 1 2 3 4 5 6 7 8 9 10; do printf 'fish%s' "$n" | sha256sum >/dev/null; n=$((n + 1)); done
+  done
+  echo "sha256 operations in 5 s: $n"
+  echo
+  echo "-- Disk test: write+read 256 MB in the home directory --"
+  tmp=$(mktemp -p "$HOME" .fisharchy-bench.XXXXXX)
+  dd if=/dev/zero of="$tmp" bs=1M count=256 conv=fdatasync 2>&1 | tail -n 1
+  sync; echo 3 | sudo -n tee /proc/sys/vm/drop_caches >/dev/null 2>&1 || echo "(page cache not dropped: read speed may be cached; run with sudo access for true read speed)"
+  dd if="$tmp" of=/dev/null bs=1M 2>&1 | tail -n 1
+  rm -f -- "$tmp"
+} >"$out" 2>&1
+
+echo "Wrote $out"

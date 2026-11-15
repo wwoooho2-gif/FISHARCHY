@@ -1,0 +1,87 @@
+#!/bin/bash
+# fisharchy-mode: show or switch between Safe and Max Performance.
+#   Safe             CPU security mitigations ON (default).
+#   Max Performance  mitigations=off split_lock_detect=off (small speed gain, real security cost).
+# Both modes keep nowatchdog. Usage: fisharchy-mode [status|safe|max] [--yes]
+set -euo pipefail
+
+root=${FISHARCHY_ROOT:-}
+cmdline_file=$root/etc/kernel/cmdline
+dropin=$root/etc/limine-entry-tool.d/99-fisharchy-performance.conf
+release=$root/etc/fisharchy-release
+
+action=${1:-status}
+assume_yes=0
+[[ ${2:-} == --yes || ${1:-} == --yes ]] && assume_yes=1
+[[ $action == --yes ]] && action=status
+
+current() {
+  if [[ -f $cmdline_file ]] && grep -qw 'mitigations=off' "$cmdline_file"; then echo max; else echo safe; fi
+}
+
+case $action in
+  status)
+    echo "FISHARCHY performance mode: $(current)"
+    echo "Running kernel command line: $(cat /proc/cmdline 2>/dev/null || echo unknown)"
+    exit 0
+    ;;
+  safe|max) ;;
+  -h|--help) sed -n '2,6p' "$0" | sed 's/^# \?//'; exit 0 ;;
+  *) echo "usage: fisharchy-mode [status|safe|max] [--yes]" >&2; exit 1 ;;
+esac
+
+if [[ -z $root ]] && (( EUID != 0 )); then
+  exec sudo -- "$0" "$@"
+fi
+[[ -f $cmdline_file ]] || { echo "fisharchy-mode: $cmdline_file not found; is this a FISHARCHY install?" >&2; exit 1; }
+
+if [[ $(current) == "$action" ]]; then
+  echo "Already in $action mode."
+  exit 0
+fi
+
+if [[ $action == max ]]; then
+  cat <<'MSG'
+Switching to MAX PERFORMANCE.
+  - Turns OFF CPU protections against Spectre, Meltdown, L1TF, SRSO and similar attacks.
+  - Turns off split-lock detection.
+  - Gain: a few percent on syscall-heavy work; usually little in games.
+  - Cost: malicious code (a browser exploit, a bad script) can read memory it should not.
+  Only choose this on a machine you trust and do not use for banking or private data.
+MSG
+else
+  cat <<'MSG'
+Switching to SAFE.
+  - CPU security mitigations are turned back ON (kernel defaults).
+  - Some CPUs lose a few percent in syscall-heavy workloads.
+MSG
+fi
+
+if (( ! assume_yes )); then
+  read -rp "Continue? [y/N] " answer
+  [[ $answer == [yY]* ]] || { echo "Cancelled."; exit 1; }
+fi
+
+new_extra="nowatchdog"
+[[ $action == max ]] && new_extra+=" mitigations=off split_lock_detect=off"
+
+# Strip our tokens, then append the new set (keeps all other options untouched).
+base=$(sed -E 's/(^| )(nowatchdog|mitigations=off|split_lock_detect=off)( |$)/ /g; s/(^| )(nowatchdog|mitigations=off|split_lock_detect=off)( |$)/ /g; s/[[:space:]]+$//' "$cmdline_file")
+printf '%s %s\n' "$base" "$new_extra" >"$cmdline_file"
+
+mkdir -p "$(dirname -- "$dropin")"
+printf 'KERNEL_CMDLINE[default]+=" %s"\n' "$new_extra" >"$dropin"
+
+if [[ -f $release ]]; then
+  sed -i "s/^performance=.*/performance=$action/" "$release"
+fi
+
+if [[ -n $root ]]; then
+  echo "Test root in use: boot entries not regenerated."
+elif command -v limine-update >/dev/null 2>&1; then
+  limine-update
+else
+  echo "Could not find limine-update; run your boot entry update command, then reboot." >&2
+  exit 1
+fi
+echo "Now in $action mode. Reboot to apply."
