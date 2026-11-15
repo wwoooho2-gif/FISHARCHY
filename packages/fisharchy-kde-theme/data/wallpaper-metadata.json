@@ -1,0 +1,8 @@
+{
+    "KPlugin": {
+        "Authors": [{ "Name": "FISHARCHY" }],
+        "Id": "FisharchyReef",
+        "Name": "FISHARCHY Reef",
+        "License": "MIT"
+    }
+}

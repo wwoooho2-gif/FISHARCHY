@@ -1,0 +1,29 @@
+pkgname=fisharchy-kde-theme
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='FISHARCHY Neon look for KDE Plasma: color scheme, reef wallpaper and first-login setup'
+arch=('any')
+options=('!debug')
+url='https://github.com/wwoooho2-gif'
+license=('MIT')
+depends=('plasma-desktop')
+
+package() {
+  # Color scheme (selectable in System Settings) and system-wide defaults
+  # for every new user.
+  install -Dm644 "$startdir/data/FisharchyNeon.colors" \
+    "$pkgdir/usr/share/color-schemes/FisharchyNeon.colors"
+  install -Dm644 "$startdir/data/kdeglobals" "$pkgdir/etc/xdg/kdeglobals"
+
+  # Wallpaper package
+  local wp="$pkgdir/usr/share/wallpapers/FisharchyReef"
+  install -Dm644 "$startdir/data/wallpaper-metadata.json" "$wp/metadata.json"
+  install -Dm644 "$startdir/wallpaper/1920x1080.png" "$wp/contents/images/1920x1080.png"
+  install -Dm644 "$startdir/wallpaper/2560x1440.png" "$wp/contents/images/2560x1440.png"
+
+  # First-login script, run once per user from KDE autostart
+  install -Dm755 "$startdir/scripts/fisharchy-theme-apply" \
+    "$pkgdir/usr/share/fisharchy/fisharchy-theme-apply"
+  install -Dm644 "$startdir/data/fisharchy-theme.desktop" \
+    "$pkgdir/etc/xdg/autostart/fisharchy-theme.desktop"
+}

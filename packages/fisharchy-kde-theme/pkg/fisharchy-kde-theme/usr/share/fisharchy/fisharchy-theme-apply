@@ -1,0 +1,26 @@
+#!/bin/bash
+# fisharchy-theme-apply: applied once per user at first KDE login.
+# Sets the FISHARCHY Neon color scheme and the Reef wallpaper through KDE's own
+# tools. Safe to run twice (marker file); pass --force to apply again.
+set -uo pipefail
+
+state="$HOME/.local/state/fisharchy"
+marker="$state/kde-theme-applied"
+[[ ${1:-} == --force ]] || { [[ -f $marker ]] && exit 0; }
+mkdir -p "$state"
+
+# Wait (up to 60 s) for the Plasma shell to appear on the session bus.
+for _ in $(seq 60); do
+  busctl --user list 2>/dev/null | grep -q org.kde.plasmashell && break
+  sleep 1
+done
+sleep 2
+
+if command -v plasma-apply-colorscheme >/dev/null 2>&1; then
+  plasma-apply-colorscheme FisharchyNeon >>"$state/theme.log" 2>&1 || true
+fi
+if command -v plasma-apply-wallpaperimage >/dev/null 2>&1; then
+  plasma-apply-wallpaperimage /usr/share/wallpapers/FisharchyReef >>"$state/theme.log" 2>&1 || true
+fi
+
+touch "$marker"

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=FISHARCHY theme
+Comment=Applies the FISHARCHY Neon colors and wallpaper at first login
+Exec=/usr/share/fisharchy/fisharchy-theme-apply
+Terminal=false
+NoDisplay=true
+OnlyShowIn=KDE;
+X-KDE-autostart-phase=2

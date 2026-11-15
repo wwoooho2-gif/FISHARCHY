@@ -3,6 +3,7 @@ pkgver=0.2.0
 pkgrel=1
 pkgdesc='Radio Atlas plugin for the Omarchy shell'
 arch=('any')
+options=('!debug')
 url='https://github.com/AksharP5/omarchy-radio-atlas'
 license=('MIT')
 depends=('jq')
