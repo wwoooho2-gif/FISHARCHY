@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/brand/fisharchy-logo.png" alt="FISHARCHY" width="420"></p>
+
 # FISHARCHY
 
 A custom [Omarchy](https://omarchy.org/) ISO: clean, neon, and built around the
@@ -15,13 +17,17 @@ The finished image is published in this repository's **Releases** as
 
 ## Preview
 
-| Boot splash | SDDM login |
-|---|---|
-| ![Neon FISHARCHY boot splash](docs/preview/boot.png) | ![Neon SDDM login screen](docs/preview/login.png) |
+**Boot splash** (neon `#19e6ff` wordmark on `#0d1a3d`, with the disk-unlock prompt):
 
-| Fish theme desktop | FISHARCHY bar layout |
+![Neon FISHARCHY boot splash](docs/preview/boot.png)
+
+| SDDM login | Fish theme desktop |
 |---|---|
-| ![Fish theme desktop](docs/preview/desktop.png) | ![FISHYLAYOUT bar, dashboard, and dock](docs/preview/layout.png) |
+| ![Neon SDDM login screen](docs/preview/login.png) | ![Fish theme desktop](docs/preview/desktop.png) |
+
+**FISHARCHY bar layout:**
+
+![FISHYLAYOUT bar, dashboard, and dock](docs/preview/layout.png)
 
 ![Radio Atlas plugin](docs/preview/radio-atlas.png)
 
@@ -209,7 +215,7 @@ First-boot behavior comes from `/etc/skel` hooks installed by the packages: `05-
 
 Compare a fresh install with the screenshots under `docs/preview/`:
 
-- [ ] **Boot splash:** navy `#0d1a3d` background, cyan `#19e6ff` FISHARCHY wordmark, no text boot messages.
+- [ ] **Boot splash:** matches `docs/preview/boot.png`: navy `#0d1a3d` background, pixel-style cyan-to-blue FISHARCHY wordmark, lock icon and password box below it, no text boot messages.
 - [ ] **Login (SDDM):** neon login screen with the same palette and wordmark.
 - [ ] **Desktop:** Fish theme with the animated reef wallpaper behind the windows.
 - [ ] **Bar:** Fish menu button at the left, media beside the clock, GPU/audio/network/power icons on the right.
