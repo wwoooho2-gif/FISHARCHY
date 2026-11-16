@@ -69,14 +69,27 @@ rebrand_installer() {
 
   # Put the helper on the live ISO (/usr/local/bin/fisharchy-wifi). /configs is mounted in the build container.
   install -Dm755 "$root/iso/fisharchy-wifi" "$tree/configs/fisharchy-wifi"
+  # Wi-Fi step in the live session: ship the helper and a login hook straight into the airootfs overlay.
+  # The hook runs before the Omarchy installer starts, so no installer file has to be found or edited.
+  install -Dm755 "$root/iso/fisharchy-wifi" "$tree/configs/airootfs/usr/local/bin/fisharchy-wifi"
+  install -Dm644 "$root/iso/fisharchy-wifi-hook.sh" "$tree/configs/airootfs/etc/profile.d/00-fisharchy-wifi.sh"
+  echo "    wifi step -> configs/airootfs (login hook + helper)"
+  # archiso refuses to build unless every executable in the airootfs is listed in profiledef.sh.
+  local profiledef=$tree/configs/profiledef.sh
+  if [[ -f $profiledef ]] && ! grep -q '/usr/local/bin/fisharchy-wifi' "$profiledef"; then
+    if grep -q '^file_permissions=(' "$profiledef"; then
+      sed -i '/^file_permissions=(/a\  ["/usr/local/bin/fisharchy-wifi"]="0:0:755"' "$profiledef"
+      echo "    wifi helper permissions -> configs/profiledef.sh"
+    else
+      echo "WARNING: no file_permissions array in configs/profiledef.sh; the build may fail on fisharchy-wifi" >&2
+    fi
+  fi
   local iso_script=$tree/builder/build-iso.sh
   local wifi_anchor='mkdir -p "$build_cache_dir/airootfs/usr/share/omarchy-iso"'
   if [[ -f $iso_script ]] && ! grep -q 'fisharchy-wifi' "$iso_script"; then
     if [[ $(grep -cFx -- "$wifi_anchor" "$iso_script") == 1 ]]; then
       sed -i "\|^mkdir -p \"\$build_cache_dir/airootfs/usr/share/omarchy-iso\"\$|a install -Dm755 /configs/fisharchy-wifi \"\$build_cache_dir/airootfs/usr/local/bin/fisharchy-wifi\"" "$iso_script"
       echo "    wifi helper -> builder/build-iso.sh"
-    else
-      echo "WARNING: anchor for fisharchy-wifi not found in builder/build-iso.sh; the Wi-Fi helper is NOT in this ISO" >&2
     fi
   fi
 
