@@ -162,7 +162,7 @@ The same values are written to `/etc/fisharchy-release` on every installed syste
 > non-English language files, so it **may not boot, or may have no working Wi-Fi, Bluetooth or
 > graphics, on any other machine**. Never publish or share a lean ISO.
 
-### Small network-install ISO (`fisharchy.iso`)
+### Small network-install ISO (`fisharchy.iso`) WITCH DOSE NOT WORK ATM
 
 ```bash
 ./build-fisharchy.sh --netinstall
